@@ -73,3 +73,4 @@ cargo deb -p nym-mixnode
 # This will init the mixnode to `/etc/nym` as `nym` user, and create a systemd service
 sudo dpkg -i target/debian/<PACKAGE>
 ```
+
