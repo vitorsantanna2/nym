@@ -685,6 +685,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-vec"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+
+[[package]]
 name = "bitcoin_hashes"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -790,6 +796,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8894febbff9f758034a5b8e12d87918f56dfc64a8e1fe757d65e29041538d93"
 dependencies = [
  "generic-array 0.14.7",
+]
+
+[[package]]
+name = "bloomfilter"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b64d54e47a7f4fd723f082e8f11429f3df6ba8adaeca355a76556f9f0602bbcf"
+dependencies = [
+ "bit-vec",
+ "getrandom 0.2.10",
+ "siphasher",
 ]
 
 [[package]]
@@ -5055,6 +5072,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bip39",
+ "bloomfilter",
  "bs58 0.5.0",
  "cfg-if",
  "clap 4.4.7",
@@ -5075,7 +5093,6 @@ dependencies = [
  "nym-bandwidth-controller",
  "nym-bin-common",
  "nym-coconut",
- "nym-coconut-bandwidth-contract-common",
  "nym-coconut-dkg-common",
  "nym-compact-ecash",
  "nym-config",
@@ -5085,6 +5102,7 @@ dependencies = [
  "nym-credentials-interface",
  "nym-crypto",
  "nym-dkg",
+ "nym-ecash-contract-common",
  "nym-gateway-client",
  "nym-inclusion-probability",
  "nym-mixnet-contract-common",
@@ -5605,6 +5623,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bls12_381",
+ "chrono",
  "cosmrs 0.15.0 (git+https://github.com/jstuczyn/cosmos-rust?branch=nym-temp/all-validator-features)",
  "log",
  "nym-api-requests",
@@ -5751,7 +5770,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bip39",
+ "bloomfilter",
  "bs58 0.5.0",
+ "chrono",
  "clap 4.4.7",
  "colored",
  "dashmap",
@@ -6936,9 +6957,9 @@ dependencies = [
  "humantime 2.1.0",
  "humantime-serde",
  "nym-bin-common",
- "nym-coconut",
  "nym-coconut-bandwidth-contract-common",
  "nym-coconut-dkg-common",
+ "nym-compact-ecash",
  "nym-config",
  "nym-credentials",
  "nym-crypto",
@@ -9337,6 +9358,12 @@ dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
 ]
+
+[[package]]
+name = "siphasher"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
 name = "slab"
