@@ -5610,6 +5610,7 @@ dependencies = [
  "nym-api-requests",
  "nym-credentials-interface",
  "nym-crypto",
+ "nym-ecash-contract-common",
  "nym-validator-client",
  "rand 0.7.3",
  "serde",
