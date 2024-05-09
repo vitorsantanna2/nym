@@ -225,7 +225,7 @@ where
         };
 
         let mut base_builder =
-            BaseClientBuilder::new(&self.config.base, self.storage, dkg_query_client)
+            BaseClientBuilder::new(&self.config.base, self.storage, dkg_query_client, None)
                 .with_gateway_setup(self.setup_method);
 
         if let Some(custom_mixnet) = &self.custom_mixnet {

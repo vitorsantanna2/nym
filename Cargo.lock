@@ -401,6 +401,44 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
+<<<<<<< HEAD
+ "sync_wrapper 1.0.1",
+=======
+ "sync_wrapper 0.1.2",
+>>>>>>> 3f6d95272 (Initial commit)
+ "tokio",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "axum"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a6c9af12842a67734c9a2e355436e5d03b22383ed60cf13cd0c18fbfe3dcbcf"
+dependencies = [
+ "async-trait",
+ "axum-core 0.4.3",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "hyper 1.2.0",
+ "hyper-util",
+ "itoa",
+ "matchit",
+ "memchr",
+ "mime",
+ "percent-encoding",
+ "pin-project-lite 0.2.13",
+ "rustversion",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_urlencoded",
  "sync_wrapper 1.0.1",
  "tokio",
  "tower",
@@ -429,6 +467,30 @@ dependencies = [
 [[package]]
 name = "axum-core"
 version = "0.4.3"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "mime",
+ "pin-project-lite 0.2.13",
+ "rustversion",
+ "sync_wrapper 0.1.2",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "backtrace"
+version = "0.3.69"
+>>>>>>> 3f6d95272 (Initial commit)
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a15c63fd72d41492dc4f497196f5da1fb04fb7529e631d73630d1b491e47a2e3"
 dependencies = [
@@ -3829,6 +3891,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "nnm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum 0.7.5",
+ "crossbeam-channel",
+ "futures",
+ "nym-bin-common",
+ "nym-network-defaults",
+ "nym-sdk",
+ "rand 0.8.5",
+ "tokio",
+ "tokio-util",
+ "uuid 1.5.0",
+]
+
+[[package]]
 name = "no-std-compat"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4244,6 +4323,7 @@ dependencies = [
  "nym-topology",
  "nym-validator-client",
  "rand 0.7.3",
+ "rand_chacha 0.2.2",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -4729,7 +4809,11 @@ dependencies = [
 name = "nym-http-api-common"
 version = "0.1.0"
 dependencies = [
+<<<<<<< HEAD
  "axum 0.7.5",
+=======
+ "axum 0.6.20",
+>>>>>>> 3f6d95272 (Initial commit)
  "bytes",
  "mime",
  "serde",
@@ -4889,9 +4973,15 @@ name = "nym-mixnode"
 version = "1.1.37"
 dependencies = [
  "anyhow",
+<<<<<<< HEAD
  "axum 0.7.5",
  "bs58 0.5.1",
  "clap 4.5.4",
+=======
+ "axum 0.6.20",
+ "bs58 0.5.0",
+ "clap 4.4.7",
+>>>>>>> 3f6d95272 (Initial commit)
  "colored",
  "cupid",
  "dirs 4.0.0",
@@ -5118,8 +5208,12 @@ dependencies = [
 name = "nym-node-http-api"
 version = "0.1.0"
 dependencies = [
+<<<<<<< HEAD
  "axum 0.7.5",
  "axum-extra",
+=======
+ "axum 0.6.20",
+>>>>>>> 3f6d95272 (Initial commit)
  "colored",
  "dashmap",
  "fastrand 2.1.0",
@@ -5183,6 +5277,7 @@ dependencies = [
  "nym-task",
  "nym-topology",
  "rand 0.7.3",
+ "rand_chacha 0.2.2",
  "serde",
  "serde_json",
  "thiserror",
@@ -5480,6 +5575,7 @@ dependencies = [
  "nym-sphinx-types",
  "nym-topology",
  "rand 0.7.3",
+ "rand_chacha 0.2.2",
  "rand_distr",
  "thiserror",
  "tokio",
@@ -8254,6 +8350,15 @@ checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 [[package]]
 name = "sync_wrapper"
 version = "1.0.1"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
+
+[[package]]
+name = "synstructure"
+version = "0.12.6"
+>>>>>>> 3f6d95272 (Initial commit)
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7065abeca94b6a8a577f9bd45aa0867a2238b74e8eb67cf10d492bc39351394"
 
@@ -8788,7 +8893,11 @@ checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
  "async-trait",
  "axum 0.6.20",
+<<<<<<< HEAD
  "base64 0.21.7",
+=======
+ "base64 0.21.4",
+>>>>>>> 3f6d95272 (Initial commit)
  "bytes",
  "futures-core",
  "futures-util",
@@ -9293,7 +9402,11 @@ version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b39868d43c011961e04b41623e050aedf2cc93652562ff7935ce0f819aaf2da"
 dependencies = [
+<<<<<<< HEAD
  "axum 0.7.5",
+=======
+ "axum 0.6.20",
+>>>>>>> 3f6d95272 (Initial commit)
  "mime_guess",
  "regex",
  "rust-embed",

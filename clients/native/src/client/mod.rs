@@ -80,8 +80,11 @@ impl SocketClient {
     }
 
     /// blocking version of `start_socket` method. Will run forever (or until SIGINT is sent)
-    pub async fn run_socket_forever(self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let shutdown = self.start_socket().await?;
+    pub async fn run_socket_forever(
+        self,
+        seed: Option<u64>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let shutdown = self.start_socket(seed).await?;
 
         let res = shutdown.wait_for_shutdown().await;
         log::info!("Stopping nym-client");
@@ -97,7 +100,10 @@ impl SocketClient {
     }
 
     // TODO: see if this could also be shared with socks5 client / nym-sdk maybe
-    async fn create_base_client_builder(&self) -> Result<NativeClientBuilder, ClientError> {
+    async fn create_base_client_builder(
+        &self,
+        seed: Option<u64>,
+    ) -> Result<NativeClientBuilder, ClientError> {
         // don't create dkg client for the bandwidth controller if credentials are disabled
         let dkg_query_client = if self.config.base.client.disabled_credentials_mode {
             None
@@ -107,7 +113,8 @@ impl SocketClient {
 
         let storage = self.initialise_storage().await?;
 
-        let mut base_client = BaseClientBuilder::new(&self.config.base, storage, dkg_query_client);
+        let mut base_client =
+            BaseClientBuilder::new(&self.config.base, storage, dkg_query_client, seed);
 
         if let Some(custom_mixnet) = &self.custom_mixnet {
             base_client = base_client.with_stored_topology(custom_mixnet)?;
@@ -116,12 +123,12 @@ impl SocketClient {
         Ok(base_client)
     }
 
-    pub async fn start_socket(self) -> Result<TaskHandle, ClientError> {
+    pub async fn start_socket(self, seed: Option<u64>) -> Result<TaskHandle, ClientError> {
         if !self.config.socket.socket_type.is_websocket() {
             return Err(ClientError::InvalidSocketMode);
         }
 
-        let base_builder = self.create_base_client_builder().await?;
+        let base_builder = self.create_base_client_builder(seed).await?;
         let packet_type = self.config.base.debug.traffic.packet_type;
         let mut started_client = base_builder.start_base().await?;
         let self_address = started_client.address;
