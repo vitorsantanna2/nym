@@ -29,6 +29,16 @@ macro_rules! inc_by {
 }
 
 #[macro_export]
+macro_rules! now {
+    () => {
+        match std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH) {
+            Ok(n) => n.as_secs(),
+            Err(_) => 0,
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! inc {
     ($name:literal) => {
         $crate::REGISTRY.inc($crate::prepend_package_name!($name));
@@ -39,6 +49,20 @@ macro_rules! inc {
 macro_rules! metrics {
     () => {
         $crate::REGISTRY.to_string();
+    };
+}
+
+#[macro_export]
+macro_rules! fragment_recieved {
+    ($seed:expr) => {
+        $crate::FRAGMENTS_RECEIVED.insert($seed, $crate::now!());
+    };
+}
+
+#[macro_export]
+macro_rules! fragment_sent {
+    ($seed:expr) => {
+        $crate::FRAGMENTS_SENT.insert($seed, $crate::now!());
     };
 }
 
@@ -57,6 +81,8 @@ macro_rules! nanos {
 
 lazy_static::lazy_static! {
     pub static ref REGISTRY: MetricsController = MetricsController::default();
+    pub static ref FRAGMENTS_RECEIVED: DashMap<u64, u64> = DashMap::new();
+    pub static ref FRAGMENTS_SENT: DashMap<u64, u64> = DashMap::new();
 }
 
 #[derive(Default)]
