@@ -104,7 +104,7 @@ impl ReconstructionBuffer {
             }
         });
 
-        nym_metrics::fragment_recieved!(fragment.seed());
+        // nym_metrics::fragment_recieved!(fragment.seed());
 
         let fragment_index = fragment.current_fragment() as usize - 1;
         if self.fragments[fragment_index].is_some() {

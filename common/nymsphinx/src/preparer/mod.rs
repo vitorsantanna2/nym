@@ -50,6 +50,7 @@ pub trait FragmentPreparer {
     type Rng: CryptoRng + Rng;
 
     fn rng(&mut self) -> &mut Self::Rng;
+    fn nonce(&self) -> i32;
     fn num_mix_hops(&self) -> u8;
     fn average_packet_delay(&self) -> Duration;
     fn average_ack_delay(&self) -> Duration;
@@ -196,9 +197,10 @@ pub trait FragmentPreparer {
         // each plain or repliable packet (i.e. not a reply) attaches an ephemeral public key so that the recipient
         // could perform diffie-hellman with its own keys followed by a kdf to re-derive
         // the packet encryption key
-        let seed = fragment.seed();
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
-        nym_metrics::fragment_sent!(seed);
+
+        let seed = fragment.seed().wrapping_mul(self.nonce());
+        let mut rng = ChaCha8Rng::seed_from_u64(seed as u64);
+        // nym_metrics::fragment_sent!(seed);
 
         let non_reply_overhead = encryption::PUBLIC_KEY_SIZE;
         let expected_plaintext = match packet_type {
@@ -317,6 +319,8 @@ pub struct MessagePreparer<R> {
     /// Number of mix hops each packet ('real' message, ack, reply) is expected to take.
     /// Note that it does not include gateway hops.
     num_mix_hops: u8,
+
+    nonce: i32,
 }
 
 impl<R> MessagePreparer<R>
@@ -329,12 +333,15 @@ where
         average_packet_delay: Duration,
         average_ack_delay: Duration,
     ) -> Self {
+        let mut rng = rng;
+        let nonce = rng.gen();
         MessagePreparer {
             rng,
             sender_address,
             average_packet_delay,
             average_ack_delay,
             num_mix_hops: DEFAULT_NUM_MIX_HOPS,
+            nonce,
         }
     }
 
@@ -457,6 +464,10 @@ impl<R: CryptoRng + Rng> FragmentPreparer for MessagePreparer<R> {
 
     fn average_ack_delay(&self) -> Duration {
         self.average_ack_delay
+    }
+
+    fn nonce(&self) -> i32 {
+        self.nonce
     }
 }
 

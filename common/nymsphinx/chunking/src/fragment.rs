@@ -216,10 +216,10 @@ impl Fragment {
         }
     }
 
-    pub fn seed(&self) -> u64 {
-        let mut seed = self.header.id as u64;
-        seed = seed.wrapping_mul(self.header.total_fragments as u64);
-        seed = seed.wrapping_mul(self.header.current_fragment as u64);
+    pub fn seed(&self) -> i32 {
+        let mut seed = self.header.id;
+        seed = seed.wrapping_mul(self.header.total_fragments as i32);
+        seed = seed.wrapping_mul(self.header.current_fragment as i32);
         seed
     }
 
