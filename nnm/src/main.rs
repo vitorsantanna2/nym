@@ -31,10 +31,10 @@ impl ClientWrapper {
 }
 
 async fn make_client() -> Result<ClientWrapper> {
-    let ff_net = mixnet::NymNetworkDetails::new_from_env();
+    let net = mixnet::NymNetworkDetails::new_from_env();
 
     let mixnet_client = mixnet::MixnetClientBuilder::new_ephemeral()
-        .network_details(ff_net)
+        .network_details(net)
         // .enable_credentials_mode()
         .build()?;
 
@@ -47,7 +47,7 @@ async fn make_client() -> Result<ClientWrapper> {
 async fn main() -> Result<()> {
     nym_bin_common::logging::setup_logging();
 
-    setup_env(Some("ff.env"));
+    setup_env(Some("../envs/mainnet.env"));
 
     let cancel_token = CancellationToken::new();
 

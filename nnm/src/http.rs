@@ -4,6 +4,7 @@ use axum::routing::get;
 use axum::Router;
 use futures::StreamExt;
 use nym_sdk::mixnet::MixnetMessageSender;
+use nym_sphinx::chunking::FRAGMENTS_RECEIVED;
 use rand::seq::SliceRandom;
 use std::future::IntoFuture;
 use std::net::SocketAddr;
@@ -88,7 +89,7 @@ async fn send_receive_mixnet(state: AppState) -> Response<String> {
     let receiving_task_handle = tokio::spawn(async move {
         if let Some(received) = recv.write().await.client.next().await {
             println!("Received: {}", String::from_utf8_lossy(&received.message));
-            println!("{:?}", *nym_metrics::FRAGMENTS_RECEIVED);
+            println!("{:?}", *FRAGMENTS_RECEIVED);
         }
 
         // client.write().await.disconnect().await;

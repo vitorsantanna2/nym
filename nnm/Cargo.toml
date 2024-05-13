@@ -26,4 +26,4 @@ nym-sdk = { path = "../sdk/rust/nym-sdk" }
 nym-bin-common = { path = "../common/bin-common" }
 nym-network-defaults = { path = "../common/network-defaults" }
 nym-topology = { path = "../common/topology" }
-nym-metrics = { path = "../common/nym-metrics" }
+nym-sphinx = { path = "../common/nymsphinx" }

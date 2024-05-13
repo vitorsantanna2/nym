@@ -3899,9 +3899,9 @@ dependencies = [
  "crossbeam-channel",
  "futures",
  "nym-bin-common",
- "nym-metrics",
  "nym-network-defaults",
  "nym-sdk",
+ "nym-sphinx",
  "nym-topology",
  "rand 0.7.3",
  "rand_chacha 0.2.2",
@@ -5636,6 +5636,8 @@ dependencies = [
 name = "nym-sphinx-chunking"
 version = "0.1.0"
 dependencies = [
+ "dashmap",
+ "lazy_static",
  "log",
  "nym-metrics",
  "nym-sphinx-addressing",

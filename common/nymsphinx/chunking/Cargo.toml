@@ -13,6 +13,8 @@ repository = { workspace = true }
 log = { workspace = true }
 rand = { version = "0.7.3", features = ["wasm-bindgen"] }
 thiserror = { workspace = true }
+lazy_static = { workspace = true }
+dashmap = { version = "5" }
 
 nym-sphinx-addressing = { path = "../addressing" }
 nym-sphinx-params = { path = "../params" }
