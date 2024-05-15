@@ -1,8 +1,6 @@
 use anyhow::Result;
 use nym_network_defaults::setup_env;
 use nym_sdk::mixnet::{self, MixnetClient};
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -17,16 +15,11 @@ mod http;
 
 pub struct ClientWrapper {
     client: MixnetClient,
-    rng: ChaCha8Rng,
 }
 
 impl ClientWrapper {
-    pub fn new(client: MixnetClient, rng: ChaCha8Rng) -> Self {
-        Self { client, rng }
-    }
-
-    pub fn rng(&mut self) -> &mut ChaCha8Rng {
-        &mut self.rng
+    pub fn new(client: MixnetClient) -> Self {
+        Self { client }
     }
 }
 
@@ -39,8 +32,7 @@ async fn make_client() -> Result<ClientWrapper> {
         .build()?;
 
     let client = mixnet_client.connect_to_mixnet().await?;
-    let rng = ChaCha8Rng::seed_from_u64(1);
-    Ok(ClientWrapper::new(client, rng))
+    Ok(ClientWrapper::new(client))
 }
 
 #[tokio::main]
