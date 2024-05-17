@@ -115,7 +115,7 @@ impl Display for NetworkAddress {
 
 pub type MixLayer = u8;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NymTopology {
     mixes: BTreeMap<MixLayer, Vec<mix::Node>>,
     gateways: Vec<gateway::Node>,
