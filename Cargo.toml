@@ -103,7 +103,7 @@ members = [
     "service-providers/ip-packet-router",
     "service-providers/network-requester",
     "service-providers/network-statistics",
-    "nnm",
+    "nym-network-monitor",
     "nym-api",
     "nym-browser-extension/storage",
     "nym-api/nym-api-requests",
