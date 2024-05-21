@@ -58,7 +58,7 @@ impl NetworkAccount {
 
     pub fn finalize() -> Result<Self> {
         let mut account = NetworkAccount::new();
-        account.find_incomplete_fragments();
+        account.find_missing_fragments();
         account.hydrate_all_fragments()?;
         Ok(account)
     }
@@ -134,22 +134,24 @@ impl NetworkAccount {
         Ok(())
     }
 
-    fn find_incomplete_fragments(&mut self) {
+    fn find_missing_fragments(&mut self) {
         let mut missing_fragments_map = HashMap::new();
         for fragment_set_id in &self.incomplete_fragment_sets {
             if let Some(fragment_ref) = FRAGMENTS_RECEIVED.get(fragment_set_id) {
-                let ref_fragment = fragment_ref.value().first().unwrap().header();
-                let ref_id_set = (0..ref_fragment.total_fragments()).collect::<HashSet<u8>>();
-                let recieved_set = fragment_ref
-                    .value()
-                    .iter()
-                    .map(|f| f.header().current_fragment())
-                    .collect::<HashSet<u8>>();
-                let missing_fragments = ref_id_set
-                    .difference(&recieved_set)
-                    .cloned()
-                    .collect::<Vec<u8>>();
-                missing_fragments_map.insert(*fragment_set_id, missing_fragments);
+                if let Some(ref_fragment) = fragment_ref.value().first() {
+                    let ref_header = ref_fragment.header();
+                    let ref_id_set = (0..ref_header.total_fragments()).collect::<HashSet<u8>>();
+                    let recieved_set = fragment_ref
+                        .value()
+                        .iter()
+                        .map(|f| f.header().current_fragment())
+                        .collect::<HashSet<u8>>();
+                    let missing_fragments = ref_id_set
+                        .difference(&recieved_set)
+                        .cloned()
+                        .collect::<Vec<u8>>();
+                    missing_fragments_map.insert(*fragment_set_id, missing_fragments);
+                }
             };
         }
         self.missing_fragments = missing_fragments_map;

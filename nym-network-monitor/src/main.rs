@@ -32,18 +32,22 @@ async fn make_clients(
         info!("Currently spawned clients: {}", spawned_clients);
         // If we have enough clients, sleep for a minute and remove the oldest one
         if spawned_clients >= n_clients {
-            info!("New client will be spawned in 1 minute");
+            info!("New client will be spawned in {} seconds", lifetime);
             tokio::time::sleep(tokio::time::Duration::from_secs(lifetime)).await;
             info!("Removing oldest client");
-            let dropped_client = clients.write().await.pop_front().unwrap();
-            loop {
-                if Arc::strong_count(&dropped_client) == 1 {
-                    let client = Arc::into_inner(dropped_client).unwrap().into_inner();
-                    client.disconnect().await;
-                    break;
+            if let Some(dropped_client) = clients.write().await.pop_front() {
+                loop {
+                    if Arc::strong_count(&dropped_client) == 1 {
+                        if let Some(client) = Arc::into_inner(dropped_client) {
+                            client.into_inner().disconnect().await;
+                        } else {
+                            warn!("Failed to drop client, client had more then one strong ref")
+                        }
+                        break;
+                    }
+                    info!("Client still in use, waiting 2 seconds");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                 }
-                info!("Client still in use, waiting 2 seconds");
-                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             }
         }
         info!("Spawning new client");
