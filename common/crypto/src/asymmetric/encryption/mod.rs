@@ -56,7 +56,7 @@ pub struct KeyPair {
 impl KeyPair {
     #[cfg(feature = "rand")]
     pub fn new<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        let private_key = x25519_dalek::StaticSecret::new(rng);
+        let private_key = x25519_dalek::StaticSecret::random_from_rng(rng);
         let public_key = (&private_key).into();
 
         KeyPair {
@@ -211,7 +211,7 @@ impl FromStr for PrivateKey {
 impl PrivateKey {
     #[cfg(feature = "rand")]
     pub fn new<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        let x25519_secret = x25519_dalek::StaticSecret::new(rng);
+        let x25519_secret = x25519_dalek::StaticSecret::random_from_rng(rng);
 
         PrivateKey(x25519_secret)
     }
