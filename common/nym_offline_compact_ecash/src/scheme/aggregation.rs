@@ -3,7 +3,6 @@
 
 use core::iter::Sum;
 use core::ops::Mul;
-use std::cell::Cell;
 
 use bls12_381::{G2Prepared, G2Projective, Scalar};
 use group::Curve;
@@ -151,6 +150,6 @@ pub fn aggregate_wallets(
         sig: aggregated_signature,
         v: *req_info.get_v(),
         expiration_date: *req_info.get_expiration_date(),
-        l: Cell::new(0),
+        l: 0,
     })
 }

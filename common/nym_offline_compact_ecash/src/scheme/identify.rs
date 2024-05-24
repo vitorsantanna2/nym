@@ -134,7 +134,7 @@ mod tests {
         .collect();
 
         // Aggregate partial wallets
-        let aggr_wallet = aggregate_wallets(
+        let mut aggr_wallet = aggregate_wallets(
             &verification_key,
             user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -148,7 +148,7 @@ mod tests {
         };
         let spend_vv = 1;
 
-        let (payment1, _upd_wallet) = aggr_wallet
+        let payment1 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,
@@ -246,7 +246,7 @@ mod tests {
         .collect();
 
         // Aggregate partial wallets
-        let aggr_wallet = aggregate_wallets(
+        let mut aggr_wallet = aggregate_wallets(
             &verification_key,
             user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -260,7 +260,7 @@ mod tests {
         };
         let spend_vv = 1;
 
-        let (payment1, upd_wallet) = aggr_wallet
+        let payment1 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,
@@ -281,7 +281,7 @@ mod tests {
         let pay_info2 = PayInfo {
             pay_info_bytes: [7u8; 72],
         };
-        let (payment2, _) = upd_wallet
+        let payment2 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,
@@ -381,7 +381,7 @@ mod tests {
         .collect();
 
         // Aggregate partial wallets
-        let aggr_wallet = aggregate_wallets(
+        let mut aggr_wallet = aggregate_wallets(
             &verification_key,
             user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -395,7 +395,7 @@ mod tests {
         };
         let spend_vv = 1;
 
-        let (payment1, _upd_wallet) = aggr_wallet
+        let payment1 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,
@@ -414,14 +414,13 @@ mod tests {
             .unwrap());
 
         // let's reverse the spending counter in the wallet to create a double spending payment
-        let current_l = aggr_wallet.l.get();
-        aggr_wallet.l.set(current_l - 1);
+        aggr_wallet.l -= 1;
 
         let pay_info2 = PayInfo {
             pay_info_bytes: [7u8; 72],
         };
 
-        let (payment2, _) = aggr_wallet
+        let payment2 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,
@@ -525,7 +524,7 @@ mod tests {
         .collect();
 
         // Aggregate partial wallets
-        let aggr_wallet = aggregate_wallets(
+        let mut aggr_wallet = aggregate_wallets(
             &verification_key,
             user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -539,7 +538,7 @@ mod tests {
         };
         let spend_vv = 10;
 
-        let (payment1, _) = aggr_wallet
+        let payment1 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,
@@ -558,13 +557,12 @@ mod tests {
             .unwrap());
 
         // let's reverse the spending counter in the wallet to create a double spending payment
-        let current_l = aggr_wallet.l.get();
-        aggr_wallet.l.set(current_l - 10);
+        aggr_wallet.l -= 10;
 
         let pay_info2 = PayInfo {
             pay_info_bytes: [7u8; 72],
         };
-        let (payment2, _) = aggr_wallet
+        let payment2 = aggr_wallet
             .spend(
                 &params,
                 &verification_key,

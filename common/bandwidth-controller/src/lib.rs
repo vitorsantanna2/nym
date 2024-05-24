@@ -124,7 +124,7 @@ impl<C, St: Storage> BandwidthController<C, St> {
         C: DkgQueryClient + Sync + Send,
         <St as Storage>::StorageError: Send + Sync + 'static,
     {
-        let retrieved_credential = self.get_next_usable_credential().await?;
+        let mut retrieved_credential = self.get_next_usable_credential().await?;
 
         let epoch_id = retrieved_credential.credential.epoch_id();
         let credential_id = retrieved_credential.credential_id;

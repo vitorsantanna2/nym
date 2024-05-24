@@ -380,7 +380,7 @@ mod tests {
             .aggregate_signature_shares(&keypair.verification_key(), &vec![partial_wallet], sig_req)
             .unwrap();
 
-        let issued = issuance.into_issued_credential(wallet, exp_date_sigs, 1);
+        let mut issued = issuance.into_issued_credential(wallet, exp_date_sigs, 1);
         let coin_indices_signatures = generate_coin_indices_signatures(
             nym_credentials_interface::ecash_parameters(),
             &[keypair.secret_key()],

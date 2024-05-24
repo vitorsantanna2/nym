@@ -146,7 +146,7 @@ pub fn payment_from_keys_and_expiration_date(
     .collect();
 
     // Aggregate partial wallets
-    let aggr_wallet = aggregate_wallets(
+    let mut aggr_wallet = aggregate_wallets(
         &verification_key,
         user_keypair.secret_key(),
         &unblinded_wallet_shares,
@@ -159,7 +159,7 @@ pub fn payment_from_keys_and_expiration_date(
     };
     let spend_vv = 1;
 
-    let (payment, _) = aggr_wallet.spend(
+    let payment = aggr_wallet.spend(
         &params,
         &verification_key,
         user_keypair.secret_key(),

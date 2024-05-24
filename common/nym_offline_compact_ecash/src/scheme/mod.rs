@@ -1,7 +1,6 @@
 // Copyright 2024 - Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cell::Cell;
 use std::convert::TryInto;
 
 use bls12_381::{G1Projective, G2Prepared, G2Projective, Scalar};
@@ -156,7 +155,7 @@ pub struct Wallet {
     v: Scalar,
     expiration_date: Scalar,
     #[zeroize(skip)]
-    pub l: Cell<u64>,
+    pub l: u64,
 }
 
 /// Computes the hash of payment information concatenated with a numeric value.
@@ -187,12 +186,12 @@ impl Wallet {
         &self.sig
     }
 
-    pub fn v(&self) -> Scalar {
+    pub(crate) fn v(&self) -> Scalar {
         self.v
     }
 
     pub fn l(&self) -> u64 {
-        self.l.get()
+        self.l
     }
 
     pub fn expiration_date(&self) -> Scalar {
@@ -215,7 +214,7 @@ impl Wallet {
         bytes[0..96].copy_from_slice(&self.sig.to_bytes());
         bytes[96..128].copy_from_slice(&self.v.to_bytes());
         bytes[128..160].copy_from_slice(&self.expiration_date.to_bytes());
-        bytes[160..168].copy_from_slice(&self.l.get().to_le_bytes());
+        bytes[160..168].copy_from_slice(&self.l.to_le_bytes());
         bytes
     }
 
@@ -248,7 +247,7 @@ impl Wallet {
     /// A tuple containing the generated payment and a reference to the updated wallet, or an error.
     #[allow(clippy::too_many_arguments)]
     pub fn spend(
-        &self,
+        &mut self,
         params: &Parameters,
         verification_key: &VerificationKeyAuth,
         sk_user: &SecretKeyUser,
@@ -258,7 +257,7 @@ impl Wallet {
         valid_dates_signatures: Vec<ExpirationDateSignature>,
         coin_indices_signatures: Vec<CoinIndexSignature>,
         spend_date: Scalar,
-    ) -> Result<(Payment, &Self)> {
+    ) -> Result<Payment> {
         // Extract group parameters
         let grp_params = params.grp();
 
@@ -420,11 +419,10 @@ impl Wallet {
         // benchmark flag to signal that we don't want to increase the spending couter but only
         // care about the function performance.
         if !bench_flag {
-            let current_l = self.l();
-            self.l.set(current_l + spend_value);
+            self.l += spend_value;
         }
 
-        Ok((pay, self))
+        Ok(pay)
     }
 }
 
@@ -447,12 +445,12 @@ impl TryFrom<&[u8]> for Wallet {
         #[allow(clippy::unwrap_used)]
         let expiration_date_bytes: &[u8; 32] = &bytes[128..160].try_into().unwrap();
         #[allow(clippy::unwrap_used)]
-        let l_bytes: &[u8; 8] = &bytes[160..168].try_into().unwrap();
+        let l_bytes: [u8; 8] = bytes[160..168].try_into().unwrap();
 
         let sig = Signature::try_from(sig_bytes.as_slice())?;
         let v = Scalar::from_bytes(v_bytes).unwrap();
         let expiration_date = Scalar::from_bytes(expiration_date_bytes).unwrap();
-        let l = Cell::new(u64::from_le_bytes(*l_bytes));
+        let l = u64::from_le_bytes(l_bytes);
 
         Ok(Wallet {
             sig,

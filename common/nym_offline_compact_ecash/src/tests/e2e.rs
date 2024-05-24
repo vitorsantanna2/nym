@@ -94,7 +94,7 @@ mod tests {
         assert_eq!(partial_wallet, partial_wallet2);
 
         // Aggregate partial wallets
-        let aggr_wallet = aggregate_wallets(
+        let mut aggr_wallet = aggregate_wallets(
             &verification_key,
             user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -111,7 +111,7 @@ mod tests {
         };
         let spend_vv = 1;
 
-        let (payment, _) = aggr_wallet.spend(
+        let payment = aggr_wallet.spend(
             &params,
             &verification_key,
             user_keypair.secret_key(),

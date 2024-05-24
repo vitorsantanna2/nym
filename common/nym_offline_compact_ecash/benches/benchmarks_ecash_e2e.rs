@@ -166,7 +166,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
     );
 
     // Aggregate partial wallets
-    let aggr_wallet = aggregate_wallets(
+    let mut aggr_wallet = aggregate_wallets(
         &verification_key,
         user_keypair.secret_key(),
         &unblinded_wallet_shares,
@@ -203,7 +203,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
         },
     );
 
-    let (payment, _) = aggr_wallet
+    let payment = aggr_wallet
         .spend(
             &params,
             &verification_key,
@@ -236,13 +236,12 @@ fn bench_compact_ecash(c: &mut Criterion) {
     // Let's generate a double spending payment
 
     // let's reverse the spending counter in the wallet to create a double spending payment
-    let current_l = aggr_wallet.l.get();
-    aggr_wallet.l.set(current_l - case.spend_vv);
+    aggr_wallet.l -= case.spend_vv;
 
     let pay_info2 = PayInfo {
         pay_info_bytes: [7u8; 72],
     };
-    let (payment2, _) = aggr_wallet
+    let payment2 = aggr_wallet
         .spend(
             &params,
             &verification_key,

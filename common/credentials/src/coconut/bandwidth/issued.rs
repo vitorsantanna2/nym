@@ -159,14 +159,14 @@ impl IssuedBandwidthCredential {
     }
 
     pub fn prepare_for_spending(
-        &self,
+        &mut self,
         verification_key: &VerificationKeyAuth,
         pay_info: PayInfo,
         coin_indices_signatures: Vec<CoinIndexSignature>,
     ) -> Result<CredentialSpendingData, Error> {
         let params = nym_credentials_interface::ecash_parameters();
         let spend_date = today_timestamp();
-        let (payment, _) = self.wallet.spend(
+        let payment = self.wallet.spend(
             params,
             verification_key,
             &self.ecash_secret_key,
