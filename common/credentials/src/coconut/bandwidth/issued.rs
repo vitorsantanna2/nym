@@ -1,17 +1,14 @@
 // Copyright 2024 - Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::coconut::bandwidth::bandwidth_credential_params;
-use crate::coconut::bandwidth::issuance::{
-    BandwidthCredentialIssuanceDataVariant, IssuanceBandwidthCredential,
-};
+use crate::coconut::bandwidth::issuance::BandwidthCredentialIssuanceDataVariant;
 use crate::coconut::bandwidth::voucher::BandwidthVoucherIssuedData;
 use crate::coconut::bandwidth::{CredentialSpendingData, CredentialType};
 use crate::coconut::utils::today_timestamp;
 use crate::error::Error;
 use nym_credentials_interface::{
-    constants, date_scalar, CoinIndexSignature, ExpirationDateSignature, Parameters, PayInfo,
-    SecretKeyUser, VerificationKeyAuth, Wallet,
+    constants, date_scalar, CoinIndexSignature, ExpirationDateSignature, PayInfo, SecretKeyUser,
+    VerificationKeyAuth, Wallet,
 };
 use nym_validator_client::nym_api::EpochId;
 use serde::{Deserialize, Serialize};
@@ -156,10 +153,6 @@ impl IssuedBandwidthCredential {
             })
     }
 
-    pub fn default_parameters() -> Parameters {
-        IssuanceBandwidthCredential::default_parameters()
-    }
-
     pub fn typ(&self) -> CredentialType {
         self.variant_data.info()
     }
@@ -170,7 +163,7 @@ impl IssuedBandwidthCredential {
         pay_info: PayInfo,
         coin_indices_signatures: Vec<CoinIndexSignature>,
     ) -> Result<CredentialSpendingData, Error> {
-        let params = bandwidth_credential_params();
+        let params = nym_credentials_interface::ecash_parameters();
         let spend_date = today_timestamp();
         let (payment, _) = self.wallet.spend(
             params,

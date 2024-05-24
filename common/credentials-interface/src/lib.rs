@@ -7,18 +7,18 @@ use std::str::FromStr;
 use thiserror::Error;
 
 pub use nym_compact_ecash::{
-    aggregate_verification_keys, aggregate_wallets, constants, error::CompactEcashError,
-    generate_keypair_user, generate_keypair_user_from_seed, issue_verify,
+    aggregate_verification_keys, aggregate_wallets, constants, ecash_parameters,
+    error::CompactEcashError, generate_keypair_user, generate_keypair_user_from_seed, issue_verify,
+    scheme::coin_indices_signatures::aggregate_indices_signatures,
+    scheme::coin_indices_signatures::CoinIndexSignature,
+    scheme::coin_indices_signatures::PartialCoinIndexSignature,
     scheme::expiration_date_signatures::aggregate_expiration_signatures,
     scheme::expiration_date_signatures::date_scalar,
     scheme::expiration_date_signatures::ExpirationDateSignature,
     scheme::expiration_date_signatures::PartialExpirationDateSignature,
-    scheme::keygen::KeyPairUser, scheme::setup::aggregate_indices_signatures,
-    scheme::setup::CoinIndexSignature, scheme::setup::PartialCoinIndexSignature,
-    scheme::withdrawal::RequestInfo, scheme::Payment, scheme::Wallet, setup::setup,
-    setup::Parameters, utils::BlindedSignature, withdrawal_request, Base58, Bytable,
-    GroupParameters, PartialWallet, PayInfo, PublicKeyUser, SecretKeyUser, VerificationKeyAuth,
-    WithdrawalRequest,
+    scheme::keygen::KeyPairUser, scheme::withdrawal::RequestInfo, scheme::Payment, scheme::Wallet,
+    utils::BlindedSignature, withdrawal_request, Base58, Bytable, PartialWallet, PayInfo,
+    PublicKeyUser, SecretKeyUser, VerificationKeyAuth, WithdrawalRequest,
 };
 
 pub const VOUCHER_INFO_TYPE: &str = "BandwidthVoucher";
@@ -120,11 +120,9 @@ pub struct CredentialSpendingData {
 impl CredentialSpendingData {
     pub fn verify(
         &self,
-        params: &Parameters,
         verification_key: &VerificationKeyAuth,
     ) -> Result<bool, CompactEcashError> {
         self.payment.spend_verify(
-            params,
             verification_key,
             &self.pay_info,
             date_scalar(self.spend_date),

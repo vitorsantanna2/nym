@@ -1,17 +1,7 @@
 // Copyright 2024 - Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::constants;
-use crate::error::Result;
-use crate::scheme::expiration_date_signatures::{
-    aggregate_expiration_signatures, sign_expiration_date, ExpirationDateSignature,
-    PartialExpirationDateSignature,
-};
-use crate::scheme::keygen::{PublicKeyUser, SecretKeyAuth, VerificationKeyAuth};
-use crate::scheme::setup::{
-    aggregate_indices_signatures, sign_coin_indices, CoinIndexSignature, Parameters,
-    PartialCoinIndexSignature,
-};
+use crate::scheme::keygen::PublicKeyUser;
 use crate::scheme::{compute_pay_info_hash, Payment};
 
 use crate::PayInfo;
@@ -62,65 +52,14 @@ pub fn identify(
     }
 }
 
-pub fn generate_expiration_date_signatures(
-    params: &Parameters,
-    expiration_date: u64,
-    secret_keys_authorities: &[SecretKeyAuth],
-    verification_keys_auth: &[VerificationKeyAuth],
-    verification_key: &VerificationKeyAuth,
-    indices: &[u64],
-) -> Result<Vec<ExpirationDateSignature>> {
-    let mut edt_partial_signatures: Vec<Vec<PartialExpirationDateSignature>> =
-        Vec::with_capacity(constants::CRED_VALIDITY_PERIOD as usize);
-    for sk_auth in secret_keys_authorities.iter() {
-        let sign = sign_expiration_date(sk_auth, expiration_date);
-        edt_partial_signatures.push(sign);
-    }
-    let combined_data: Vec<(
-        u64,
-        VerificationKeyAuth,
-        Vec<PartialExpirationDateSignature>,
-    )> = indices
-        .iter()
-        .zip(
-            verification_keys_auth
-                .iter()
-                .zip(edt_partial_signatures.iter()),
-        )
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
-        .collect();
-
-    aggregate_expiration_signatures(params, verification_key, expiration_date, &combined_data)
-}
-
-pub fn generate_coin_indices_signatures(
-    params: &Parameters,
-    secret_keys_authorities: &[SecretKeyAuth],
-    verification_keys_auth: &[VerificationKeyAuth],
-    verification_key: &VerificationKeyAuth,
-    indices: &[u64],
-) -> Result<Vec<CoinIndexSignature>> {
-    // create the partial signatures from each authority
-    let partial_signatures: Vec<Vec<PartialCoinIndexSignature>> = secret_keys_authorities
-        .iter()
-        .map(|sk_auth| sign_coin_indices(params, verification_key, sk_auth))
-        .collect();
-
-    let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> = indices
-        .iter()
-        .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
-        .collect();
-
-    aggregate_indices_signatures(params, verification_key, &combined_data)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::scheme::identify::{identify, IdentifyResult};
-    use crate::scheme::keygen::{PublicKeyUser, SecretKeyUser};
-    use crate::scheme::setup::setup;
+    use crate::scheme::keygen::{PublicKeyUser, SecretKeyAuth, SecretKeyUser};
+    use crate::setup::Parameters;
+    use crate::tests::helpers::{
+        generate_coin_indices_signatures, generate_expiration_date_signatures,
+    };
     use crate::{
         aggregate_verification_keys, aggregate_wallets, generate_keypair_user, issue, issue_verify,
         ttp_keygen, withdrawal_request, PartialWallet, PayInfo, VerificationKeyAuth,
@@ -131,16 +70,15 @@ mod tests {
     #[test]
     fn duplicate_payments_with_the_same_pay_info() {
         let total_coins = 32;
-        let params = setup(total_coins);
+        let params = Parameters::new(total_coins);
         // NOTE: Make sure that the date timestamp are calculated at 00:00:00!!
         let expiration_date = 1703721600; // Dec 28 2023 00:00:00
         let spend_date = Scalar::from(1701907200); // Dec 07 2023 00:00:00
-        let grp = params.grp();
-        let user_keypair = generate_keypair_user(grp);
+        let user_keypair = generate_keypair_user();
 
         let (req, req_info) =
-            withdrawal_request(grp, &user_keypair.secret_key(), expiration_date).unwrap();
-        let authorities_keypairs = ttp_keygen(grp, 2, 3).unwrap();
+            withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
+        let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
             .iter()
@@ -156,7 +94,6 @@ mod tests {
 
         // generate valid dates signatures
         let dates_signatures = generate_expiration_date_signatures(
-            &params,
             expiration_date,
             &secret_keys_authorities,
             &verification_keys_auth,
@@ -178,7 +115,6 @@ mod tests {
         let mut wallet_blinded_signatures = Vec::new();
         for auth_keypair in authorities_keypairs {
             let blind_signature = issue(
-                grp,
                 auth_keypair.secret_key(),
                 user_keypair.public_key(),
                 &req,
@@ -193,21 +129,12 @@ mod tests {
         )
         .enumerate()
         .map(|(idx, (w, vk))| {
-            issue_verify(
-                grp,
-                vk,
-                &user_keypair.secret_key(),
-                w,
-                &req_info,
-                idx as u64 + 1,
-            )
-            .unwrap()
+            issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
         })
         .collect();
 
         // Aggregate partial wallets
         let aggr_wallet = aggregate_wallets(
-            grp,
             &verification_key,
             &user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -236,12 +163,12 @@ mod tests {
             .unwrap();
 
         assert!(payment1
-            .spend_verify(&params, &verification_key, &pay_info1, spend_date)
+            .spend_verify(&verification_key, &pay_info1, spend_date)
             .unwrap());
 
         let payment2 = payment1.clone();
         assert!(payment2
-            .spend_verify(&params, &verification_key, &pay_info1, spend_date)
+            .spend_verify(&verification_key, &pay_info1, spend_date)
             .unwrap());
 
         let pay_info2 = pay_info1.clone();
@@ -255,16 +182,15 @@ mod tests {
     #[test]
     fn ok_if_two_different_payments() {
         let total_coins = 32;
-        let params = setup(total_coins);
-        let grp = params.grp();
+        let params = Parameters::new(total_coins);
         // NOTE: Make sure that the date timestamp are calculated at 00:00:00!!
         let expiration_date = 1703721600; // Dec 28 2023 00:00:00
         let spend_date = Scalar::from(1701907200); // Dec 07 2023 00:00:00
-        let user_keypair = generate_keypair_user(grp);
+        let user_keypair = generate_keypair_user();
 
         let (req, req_info) =
-            withdrawal_request(grp, &user_keypair.secret_key(), expiration_date).unwrap();
-        let authorities_keypairs = ttp_keygen(grp, 2, 3).unwrap();
+            withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
+        let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
             .iter()
@@ -280,7 +206,6 @@ mod tests {
 
         // generate valid dates signatures
         let dates_signatures = generate_expiration_date_signatures(
-            &params,
             expiration_date,
             &secret_keys_authorities,
             &verification_keys_auth,
@@ -302,7 +227,6 @@ mod tests {
         let mut wallet_blinded_signatures = Vec::new();
         for auth_keypair in authorities_keypairs {
             let blind_signature = issue(
-                grp,
                 auth_keypair.secret_key(),
                 user_keypair.public_key(),
                 &req,
@@ -317,21 +241,12 @@ mod tests {
         )
         .enumerate()
         .map(|(idx, (w, vk))| {
-            issue_verify(
-                grp,
-                vk,
-                &user_keypair.secret_key(),
-                w,
-                &req_info,
-                idx as u64 + 1,
-            )
-            .unwrap()
+            issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
         })
         .collect();
 
         // Aggregate partial wallets
         let aggr_wallet = aggregate_wallets(
-            grp,
             &verification_key,
             &user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -360,7 +275,7 @@ mod tests {
             .unwrap();
 
         assert!(payment1
-            .spend_verify(&params, &verification_key, &pay_info1, spend_date)
+            .spend_verify(&verification_key, &pay_info1, spend_date)
             .unwrap());
 
         let pay_info2 = PayInfo {
@@ -381,7 +296,7 @@ mod tests {
             .unwrap();
 
         assert!(payment2
-            .spend_verify(&params, &verification_key, &pay_info2, spend_date)
+            .spend_verify(&verification_key, &pay_info2, spend_date)
             .unwrap());
 
         let identify_result = identify(payment1, payment2, pay_info1.clone(), pay_info2.clone());
@@ -391,26 +306,26 @@ mod tests {
     #[test]
     fn two_payments_with_one_repeating_serial_number_but_different_pay_info() {
         let total_coins = 32;
-        let params = setup(total_coins);
+        let params = Parameters::new(total_coins);
         let grp = params.grp();
         // NOTE: Make sure that the date timestamp are calculated at 00:00:00!!
         let expiration_date = 1703721600; // Dec 28 2023 00:00:00
         let spend_date = Scalar::from(1701907200); // Dec 07 2023 00:00:00
-        let user_keypair = generate_keypair_user(grp);
+        let user_keypair = generate_keypair_user();
 
         //  GENERATE KEYS FOR OTHER USERS
         let mut public_keys: Vec<PublicKeyUser> = Default::default();
         for _i in 0..50 {
             let sk = grp.random_scalar();
             let sk_user = SecretKeyUser { sk };
-            let pk_user = sk_user.public_key(grp);
+            let pk_user = sk_user.public_key();
             public_keys.push(pk_user.clone());
         }
         public_keys.push(user_keypair.public_key().clone());
 
         let (req, req_info) =
-            withdrawal_request(grp, &user_keypair.secret_key(), expiration_date).unwrap();
-        let authorities_keypairs = ttp_keygen(grp, 2, 3).unwrap();
+            withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
+        let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
             .iter()
@@ -426,7 +341,6 @@ mod tests {
 
         // generate valid dates signatures
         let dates_signatures = generate_expiration_date_signatures(
-            &params,
             expiration_date,
             &secret_keys_authorities,
             &verification_keys_auth,
@@ -448,7 +362,6 @@ mod tests {
         let mut wallet_blinded_signatures = Vec::new();
         for auth_keypair in authorities_keypairs {
             let blind_signature = issue(
-                grp,
                 auth_keypair.secret_key(),
                 user_keypair.public_key(),
                 &req,
@@ -463,21 +376,12 @@ mod tests {
         )
         .enumerate()
         .map(|(idx, (w, vk))| {
-            issue_verify(
-                grp,
-                vk,
-                &user_keypair.secret_key(),
-                w,
-                &req_info,
-                idx as u64 + 1,
-            )
-            .unwrap()
+            issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
         })
         .collect();
 
         // Aggregate partial wallets
         let aggr_wallet = aggregate_wallets(
-            grp,
             &verification_key,
             &user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -506,7 +410,7 @@ mod tests {
             .unwrap();
 
         assert!(payment1
-            .spend_verify(&params, &verification_key, &pay_info1, spend_date)
+            .spend_verify(&verification_key, &pay_info1, spend_date)
             .unwrap());
 
         // let's reverse the spending counter in the wallet to create a double spending payment
@@ -532,7 +436,7 @@ mod tests {
             .unwrap();
 
         assert!(payment2
-            .spend_verify(&params, &verification_key, &pay_info2, spend_date)
+            .spend_verify(&verification_key, &pay_info2, spend_date)
             .unwrap());
 
         let identify_result = identify(payment1, payment2, pay_info1.clone(), pay_info2.clone());
@@ -545,26 +449,26 @@ mod tests {
     #[test]
     fn two_payments_with_multiple_repeating_serial_numbers_but_different_pay_info() {
         let total_coins = 32;
-        let params = setup(total_coins);
+        let params = Parameters::new(total_coins);
         let grp = params.grp();
         // NOTE: Make sure that the date timestamp are calculated at 00:00:00!!
         let expiration_date = 1703721600; // Dec 28 2023 00:00:00
         let spend_date = Scalar::from(1701907200); // Dec 07 2023 00:00:00
-        let user_keypair = generate_keypair_user(grp);
+        let user_keypair = generate_keypair_user();
 
         //  GENERATE KEYS FOR OTHER USERS
         let mut public_keys: Vec<PublicKeyUser> = Default::default();
         for _ in 0..50 {
             let sk = grp.random_scalar();
             let sk_user = SecretKeyUser { sk };
-            let pk_user = sk_user.public_key(grp);
+            let pk_user = sk_user.public_key();
             public_keys.push(pk_user.clone());
         }
         public_keys.push(user_keypair.public_key().clone());
 
         let (req, req_info) =
-            withdrawal_request(grp, &user_keypair.secret_key(), expiration_date).unwrap();
-        let authorities_keypairs = ttp_keygen(grp, 2, 3).unwrap();
+            withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
+        let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
             .iter()
@@ -581,7 +485,6 @@ mod tests {
 
         // generate valid dates signatures
         let dates_signatures = generate_expiration_date_signatures(
-            &params,
             expiration_date,
             &secret_keys_authorities,
             &verification_keys_auth,
@@ -603,7 +506,6 @@ mod tests {
         let mut wallet_blinded_signatures = Vec::new();
         for auth_keypair in authorities_keypairs {
             let blind_signature = issue(
-                grp,
                 auth_keypair.secret_key(),
                 user_keypair.public_key(),
                 &req,
@@ -618,21 +520,12 @@ mod tests {
         )
         .enumerate()
         .map(|(idx, (w, vk))| {
-            issue_verify(
-                grp,
-                vk,
-                &user_keypair.secret_key(),
-                w,
-                &req_info,
-                idx as u64 + 1,
-            )
-            .unwrap()
+            issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
         })
         .collect();
 
         // Aggregate partial wallets
         let aggr_wallet = aggregate_wallets(
-            grp,
             &verification_key,
             &user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -661,7 +554,7 @@ mod tests {
             .unwrap();
 
         assert!(payment1
-            .spend_verify(&params, &verification_key, &pay_info1, spend_date)
+            .spend_verify(&verification_key, &pay_info1, spend_date)
             .unwrap());
 
         // let's reverse the spending counter in the wallet to create a double spending payment

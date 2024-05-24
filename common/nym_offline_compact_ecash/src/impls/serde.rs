@@ -1,9 +1,9 @@
 // Copyright 2024 - Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::scheme::coin_indices_signatures::PartialCoinIndexSignature;
 use crate::scheme::expiration_date_signatures::ExpirationDateSignature;
 use crate::scheme::{Payment, Wallet};
-use crate::setup::PartialCoinIndexSignature;
 use crate::traits::Base58;
 use crate::utils::BlindedSignature;
 use crate::{PayInfo, PublicKeyUser, SecretKeyUser, VerificationKeyAuth};

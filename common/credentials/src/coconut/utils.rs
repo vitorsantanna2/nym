@@ -6,8 +6,8 @@ use crate::error::Error;
 use log::{debug, warn};
 use nym_credentials_interface::{
     aggregate_expiration_signatures, aggregate_indices_signatures, aggregate_verification_keys,
-    constants, setup, Base58, CoinIndexSignature, ExpirationDateSignature,
-    PartialCoinIndexSignature, PartialExpirationDateSignature, VerificationKeyAuth, Wallet,
+    constants, Base58, CoinIndexSignature, ExpirationDateSignature, PartialCoinIndexSignature,
+    PartialExpirationDateSignature, VerificationKeyAuth, Wallet,
 };
 use nym_validator_client::client::CoconutApiClient;
 use time::{macros::time, Duration, OffsetDateTime};
@@ -64,7 +64,6 @@ pub async fn obtain_expiration_date_signatures(
         Vec<PartialExpirationDateSignature>,
     )> = Vec::with_capacity(ecash_api_clients.len());
 
-    let ecash_params = setup(constants::NB_TICKETS);
     let expiration_date = cred_exp_date_timestamp();
     for ecash_api_client in ecash_api_clients.iter() {
         match ecash_api_client
@@ -91,13 +90,8 @@ pub async fn obtain_expiration_date_signatures(
     }
 
     //this already takes care of partial signatures validation
-    aggregate_expiration_signatures(
-        &ecash_params,
-        verification_key,
-        expiration_date,
-        &signatures,
-    )
-    .map_err(Error::CompactEcashError)
+    aggregate_expiration_signatures(verification_key, expiration_date, &signatures)
+        .map_err(Error::CompactEcashError)
 }
 
 pub async fn obtain_coin_indices_signatures(
@@ -112,7 +106,6 @@ pub async fn obtain_coin_indices_signatures(
     let mut signatures: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> =
         Vec::with_capacity(ecash_api_clients.len());
 
-    let ecash_params = setup(constants::NB_TICKETS);
     for ecash_api_client in ecash_api_clients.iter() {
         match ecash_api_client.api_client.coin_indices_signatures().await {
             Ok(signature) => {
@@ -134,8 +127,12 @@ pub async fn obtain_coin_indices_signatures(
     }
 
     //this takes care of validating partial signatures
-    aggregate_indices_signatures(&ecash_params, verification_key, &signatures)
-        .map_err(Error::CompactEcashError)
+    aggregate_indices_signatures(
+        nym_credentials_interface::ecash_parameters(),
+        verification_key,
+        &signatures,
+    )
+    .map_err(Error::CompactEcashError)
 }
 
 pub async fn obtain_aggregate_wallet(

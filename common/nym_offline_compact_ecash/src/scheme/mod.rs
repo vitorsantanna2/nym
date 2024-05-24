@@ -10,20 +10,22 @@ use rand::Rng;
 use time::OffsetDateTime;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::constants;
 use crate::error::{CompactEcashError, Result};
 use crate::proofs::proof_spend::{SpendInstance, SpendProof, SpendWitness};
+use crate::scheme::coin_indices_signatures::CoinIndexSignature;
 use crate::scheme::expiration_date_signatures::{find_index, ExpirationDateSignature};
 use crate::scheme::keygen::{SecretKeyUser, VerificationKeyAuth};
-use crate::scheme::setup::{CoinIndexSignature, GroupParameters, Parameters};
+use crate::scheme::setup::{GroupParameters, Parameters};
 use crate::traits::Bytable;
 use crate::utils::{
     check_bilinear_pairing, hash_to_scalar, try_deserialize_g1_projective,
     try_deserialize_g2_projective, Signature, SignerIndex,
 };
+use crate::{constants, ecash_group_parameters};
 use crate::{Attribute, Base58};
 
 pub mod aggregation;
+pub mod coin_indices_signatures;
 pub mod expiration_date_signatures;
 pub mod identify;
 pub mod keygen;
@@ -255,7 +257,6 @@ impl Wallet {
     ///
     /// # Arguments
     ///
-    /// * `params` - The system parameters.
     /// * `verification_key` - The global verification key.
     /// * `sk_user` - The secret key of the user who wants to spend from their wallet.
     /// * `pay_info` - Unique information related to the payment.
@@ -284,6 +285,10 @@ impl Wallet {
         // Extract group parameters
         let grp_params = params.grp();
 
+        if verification_key.beta_g2.is_empty() {
+            return Err(CompactEcashError::VerificationKeyTooShort);
+        }
+
         // Wallet attributes needed for spending
         let attributes = vec![sk_user.sk, self.v(), self.expiration_date()];
 
@@ -310,15 +315,18 @@ impl Wallet {
             .get(date_signature_index)
             .unwrap()
             .clone();
-        let (date_signature_prime, date_sign_blinding_factor) =
-            date_signature.randomise(grp_params);
+        let (date_signature_prime, date_sign_blinding_factor) = date_signature.randomise();
         // compute kappa_e to prove possession of the expiration signature
+        //SAFETY: we checked that verification beta_g2 isn't empty
+        #[allow(clippy::unwrap_used)]
         let kappa_e: G2Projective = grp_params.gen2() * date_sign_blinding_factor
             + verification_key.alpha
             + verification_key.beta_g2.first().unwrap() * self.expiration_date();
 
         // pick random openings o_c and compute commitments C to v (wallet secret)
         let o_c = grp_params.random_scalar();
+        //SAFETY: grp_params is static with length 3
+        #[allow(clippy::unwrap_used)]
         let cc = grp_params.gen1() * o_c + grp_params.gamma_idx(0).unwrap() * self.v();
 
         let mut aa: Vec<G1Projective> = Default::default();
@@ -343,6 +351,8 @@ impl Wallet {
 
             let o_a_k = grp_params.random_scalar();
             o_a.push(o_a_k);
+            //SAFETY: grp_params is static with length 3
+            #[allow(clippy::unwrap_used)]
             let aa_k =
                 grp_params.gen1() * o_a_k + grp_params.gamma_idx(0).unwrap() * Scalar::from(lk);
             aa.push(aa_k);
@@ -369,8 +379,10 @@ impl Wallet {
             //SAFETY : Earlier `check_remaining_allowance` ensures we don't do out of of bound here
             #[allow(clippy::unwrap_used)]
             let coin_sign: CoinIndexSignature = *coin_indices_signatures.get(lk as usize).unwrap();
-            let (coin_sign_prime, coin_sign_blinding_factor) = coin_sign.randomise(grp_params);
+            let (coin_sign_prime, coin_sign_blinding_factor) = coin_sign.randomise();
             coin_indices_signatures_prime.push(coin_sign_prime);
+            //SAFETY: we checked that verification beta_g2 isn't empty
+            #[allow(clippy::unwrap_used)]
             let kappa_k: G2Projective = grp_params.gen2() * coin_sign_blinding_factor
                 + verification_key.alpha
                 + verification_key.beta_g2.first().unwrap() * Scalar::from(lk);
@@ -400,7 +412,6 @@ impl Wallet {
         };
 
         let zk_proof = SpendProof::construct(
-            params,
             &spend_instance,
             &spend_witness,
             verification_key,
@@ -485,12 +496,12 @@ impl Bytable for Wallet {
 
 impl Base58 for Wallet {}
 
-pub fn pseudorandom_f_delta_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Projective {
+fn pseudorandom_f_delta_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Projective {
     let pow = (v + Scalar::from(l) + Scalar::from(1)).invert().unwrap();
     params.delta() * pow
 }
 
-pub fn pseudorandom_f_g_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Projective {
+fn pseudorandom_f_g_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Projective {
     let pow = (v + Scalar::from(l) + Scalar::from(1)).invert().unwrap();
     params.gen1() * pow
 }
@@ -510,7 +521,7 @@ pub fn pseudorandom_f_g_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Proj
 ///
 /// A `G2Projective` element representing the computed value of kappa.
 ///
-pub fn compute_kappa(
+fn compute_kappa(
     params: &GroupParameters,
     verification_key: &VerificationKeyAuth,
     attributes: &[Attribute],
@@ -636,7 +647,8 @@ impl Payment {
     /// - The element `h` of the payment signature equals the identity.
     /// - The bilinear pairing check for `kappa` fails.
     ///
-    pub fn check_signature_validity(&self, params: &Parameters) -> Result<()> {
+    pub fn check_signature_validity(&self) -> Result<()> {
+        let params = ecash_group_parameters();
         if bool::from(self.sig.0.is_identity()) {
             return Err(CompactEcashError::SpendSignaturesValidity);
         }
@@ -645,7 +657,7 @@ impl Payment {
             &self.sig.0.to_affine(),
             &G2Prepared::from(self.kappa.to_affine()),
             &self.sig.1.to_affine(),
-            params.grp().prepared_miller_g2(),
+            params.prepared_miller_g2(),
         ) {
             return Err(CompactEcashError::SpendSignaturesValidity);
         }
@@ -661,7 +673,6 @@ impl Payment {
     ///
     /// # Arguments
     ///
-    /// * `params` - A reference to the system parameters required for the checks.
     /// * `verification_key` - The global verification key of the signing authorities.
     /// * `spend_date` - The date associated with the payment.
     ///
@@ -677,13 +688,17 @@ impl Payment {
     ///
     pub fn check_exp_signature_validity(
         &self,
-        params: &Parameters,
         verification_key: &VerificationKeyAuth,
         spend_date: Scalar,
     ) -> Result<()> {
+        let grp_params = ecash_group_parameters();
         // Check if the element h of the payment expiration signature equals the identity.
         if bool::from(self.sig_exp.h.is_identity()) {
             return Err(CompactEcashError::ExpirationDateSignatureValidity);
+        }
+
+        if verification_key.beta_g2.len() < 3 {
+            return Err(CompactEcashError::VerificationKeyTooShort);
         }
 
         // Calculate m1 and m2 values.
@@ -691,6 +706,8 @@ impl Payment {
         let m2: Scalar = constants::TYPE_EXP;
 
         // Perform a bilinear pairing check for kappa_e
+        //SAFETY: we checked the size of beta_G2 earlier
+        #[allow(clippy::unwrap_used)]
         let combined_kappa_e = self.kappa_e
             + verification_key.beta_g2.get(1).unwrap() * m1
             + verification_key.beta_g2.get(2).unwrap() * m2;
@@ -699,7 +716,7 @@ impl Payment {
             &self.sig_exp.h.to_affine(),
             &G2Prepared::from(combined_kappa_e.to_affine()),
             &self.sig_exp.s.to_affine(),
-            params.grp().prepared_miller_g2(),
+            grp_params.prepared_miller_g2(),
         ) {
             return Err(CompactEcashError::ExpirationDateSignatureValidity);
         }
@@ -740,7 +757,6 @@ impl Payment {
     ///
     /// # Arguments
     ///
-    /// * `params` - A reference to the system parameters required for the checks.
     /// * `verification_key` - The global verification key of the signing authorities.
     /// * `k` - The index at which to check the coin index signature.
     ///
@@ -757,7 +773,6 @@ impl Payment {
     ///
     pub fn check_coin_index_signature(
         &self,
-        params: &Parameters,
         verification_key: &VerificationKeyAuth,
         k: u64,
     ) -> Result<()> {
@@ -765,6 +780,11 @@ impl Payment {
             if bool::from(coin_idx_sign.h.is_identity()) {
                 return Err(CompactEcashError::SpendSignaturesVerification);
             }
+            if verification_key.beta_g2.len() < 3 {
+                return Err(CompactEcashError::VerificationKeyTooShort);
+            }
+            //SAFETY: we checked the size of beta_G2 earlier
+            #[allow(clippy::unwrap_used)]
             let combined_kappa_k = self.kappa_k[k as usize].to_affine()
                 + verification_key.beta_g2.get(1).unwrap() * constants::TYPE_IDX
                 + verification_key.beta_g2.get(2).unwrap() * constants::TYPE_IDX;
@@ -773,7 +793,7 @@ impl Payment {
                 &coin_idx_sign.h.to_affine(),
                 &G2Prepared::from(combined_kappa_k.to_affine()),
                 &coin_idx_sign.s.to_affine(),
-                params.grp().prepared_miller_g2(),
+                ecash_group_parameters().prepared_miller_g2(),
             ) {
                 return Err(CompactEcashError::SpendSignaturesVerification);
             }
@@ -799,7 +819,6 @@ impl Payment {
     /// Returns `Ok(true)` if the spend transaction is valid; otherwise, returns an error.
     pub fn spend_verify(
         &self,
-        params: &Parameters,
         verification_key: &VerificationKeyAuth,
         pay_info: &PayInfo,
         spend_date: Scalar,
@@ -807,15 +826,15 @@ impl Payment {
         // check if all serial numbers are different
         self.no_duplicate_serial_numbers()?;
         // Verify whether the payment signature and kappa are correct
-        self.check_signature_validity(params)?;
+        self.check_signature_validity()?;
         // Verify whether the expiration date signature and kappa_e are correct
-        self.check_exp_signature_validity(params, verification_key, spend_date)?;
+        self.check_exp_signature_validity(verification_key, spend_date)?;
 
         // Compute pay_info hash for each coin
         let mut rr = Vec::with_capacity(self.spend_value as usize);
         for k in 0..self.spend_value {
             // Verify whether the coin indices signatures and kappa_k are correct
-            self.check_coin_index_signature(params, verification_key, k)?;
+            self.check_coin_index_signature(verification_key, k)?;
             // Compute hashes R_k = H(payinfo, k)
             let rr_k = compute_pay_info_hash(pay_info, k);
             rr.push(rr_k);
@@ -832,14 +851,10 @@ impl Payment {
         };
 
         // verify the zk-proof
-        if !self.zk_proof.verify(
-            params,
-            &instance,
-            verification_key,
-            &rr,
-            pay_info,
-            self.spend_value,
-        ) {
+        if !self
+            .zk_proof
+            .verify(&instance, verification_key, &rr, pay_info, self.spend_value)
+        {
             return Err(CompactEcashError::SpendZKProofVerification);
         }
 

@@ -28,19 +28,17 @@ use nym_coconut_dkg_common::types::{
     EpochId, EpochState, PartialContractDealingData, State as ContractState,
 };
 use nym_coconut_dkg_common::verification_key::{ContractVKShare, VerificationKeyShare};
-use nym_compact_ecash::setup::GroupParameters;
 use nym_compact_ecash::utils::BlindedSignature;
 use nym_compact_ecash::{ttp_keygen, VerificationKeyAuth};
 use nym_contracts_common::IdentityKey;
 use nym_credentials::coconut::bandwidth::voucher::BandwidthVoucherIssuanceData;
 use nym_credentials::IssuanceBandwidthCredential;
 use nym_credentials_interface::CredentialType;
-use nym_crypto::asymmetric::{encryption, identity};
+use nym_crypto::asymmetric::identity;
 use nym_dkg::{NodeIndex, Threshold};
 use nym_ecash_contract_common::blacklist::{BlacklistedAccount, BlacklistedAccountResponse};
 use nym_ecash_contract_common::events::{
-    DEPOSITED_FUNDS_EVENT_TYPE, DEPOSIT_ENCRYPTION_KEY, DEPOSIT_IDENTITY_KEY, DEPOSIT_INFO,
-    DEPOSIT_VALUE,
+    DEPOSITED_FUNDS_EVENT_TYPE, DEPOSIT_IDENTITY_KEY, DEPOSIT_INFO, DEPOSIT_VALUE,
 };
 use nym_ecash_contract_common::spend_credential::{
     EcashSpentCredential, EcashSpentCredentialResponse,
@@ -1289,14 +1287,6 @@ pub fn deposit_tx_fixture(voucher_data: &BandwidthVoucherIssuanceData) -> TxResp
                         value: voucher_data.identity_key().public_key().to_base58_string(),
                         index: false,
                     },
-                    EventAttribute {
-                        key: DEPOSIT_ENCRYPTION_KEY.parse().unwrap(),
-                        value: voucher_data
-                            .encryption_key()
-                            .public_key()
-                            .to_base58_string(),
-                        index: false,
-                    },
                 ],
             }],
             codespace: "".to_string(),
@@ -1331,14 +1321,12 @@ pub fn voucher_fixture(tx_hash: Option<String>) -> IssuanceBandwidthCredential {
     };
 
     let identity_keypair = identity::KeyPair::new(&mut rng);
-    let encryption_keypair = encryption::KeyPair::new(&mut rng);
+
     let id_priv =
         identity::PrivateKey::from_bytes(&identity_keypair.private_key().to_bytes()).unwrap();
-    let enc_priv =
-        encryption::PrivateKey::from_bytes(&encryption_keypair.private_key().to_bytes()).unwrap();
     let identifier = [44u8; 32];
     // (voucher, request)
-    IssuanceBandwidthCredential::new_voucher(tx_hash, &identifier, id_priv, enc_priv)
+    IssuanceBandwidthCredential::new_voucher(tx_hash, &identifier, id_priv)
 }
 
 fn dummy_signature() -> identity::Signature {
@@ -1359,8 +1347,7 @@ struct TestFixture {
 impl TestFixture {
     async fn new() -> Self {
         let mut rng = crate::coconut::tests::fixtures::test_rng_07([69u8; 32]);
-        let coconut_params = GroupParameters::new();
-        let coconut_keypair = ttp_keygen(&coconut_params, 1, 1).unwrap().remove(0);
+        let coconut_keypair = ttp_keygen(1, 1).unwrap().remove(0);
         let identity = identity::KeyPair::new(&mut rng);
         let epoch = Arc::new(AtomicU64::new(1));
         let comm_channel =
@@ -1481,10 +1468,10 @@ mod credential_tests {
         models::VerifyEcashCredentialResponse, VerifyEcashCredentialBody,
     };
     use nym_compact_ecash::{
-        identify::{generate_coin_indices_signatures, generate_expiration_date_signatures},
-        issue, ttp_keygen, PayInfo,
+        ecash_parameters, issue,
+        tests::helpers::{generate_coin_indices_signatures, generate_expiration_date_signatures},
+        ttp_keygen, PayInfo,
     };
-    use nym_credentials::coconut::bandwidth::bandwidth_credential_params;
     use nym_validator_client::nym_api::routes::ECASH_VERIFY_ONLINE_CREDENTIAL;
 
     #[tokio::test]
@@ -1552,8 +1539,7 @@ mod credential_tests {
             AccountId::from_str(TEST_REWARDING_VALIDATOR_ADDRESS).unwrap(),
             Default::default(),
         );
-        let params = GroupParameters::new();
-        let key_pair = ttp_keygen(&params, 1, 1).unwrap().remove(0);
+        let key_pair = ttp_keygen(1, 1).unwrap().remove(0);
         let tmp_dir = tempdir().unwrap();
 
         let storage = NymApiStorage::init(tmp_dir.path().join("storage.db"))
@@ -1670,12 +1656,10 @@ mod credential_tests {
             Hash::from_str("7C41AF8266D91DE55E1C8F4712E6A952A165ED3D8C27C7B00428CBD0DE00A52B")
                 .unwrap();
 
-        let params = GroupParameters::new();
         let mut rng = OsRng;
         let nym_api_identity = identity::KeyPair::new(&mut rng);
 
         let identity_keypair = identity::KeyPair::new(&mut rng);
-        let encryption_keypair = encryption::KeyPair::new(&mut rng);
         let identifier = [42u8; 32];
         let voucher = IssuanceBandwidthCredential::new_voucher(
             tx_hash,
@@ -1684,11 +1668,9 @@ mod credential_tests {
                 identity_keypair.private_key().to_base58_string(),
             )
             .unwrap(),
-            encryption::PrivateKey::from_bytes(&encryption_keypair.private_key().to_bytes())
-                .unwrap(),
         );
 
-        let key_pair = ttp_keygen(&params, 1, 1).unwrap().remove(0);
+        let key_pair = ttp_keygen(1, 1).unwrap().remove(0);
         let tmp_dir = tempdir().unwrap();
         let storage = NymApiStorage::init(tmp_dir.path().join("storage.db"))
             .await
@@ -1763,14 +1745,12 @@ mod credential_tests {
         let db_dir = tempdir().unwrap();
 
         // generate all the credential requests
-        let params = bandwidth_credential_params();
-        let key_pair = ttp_keygen(params.grp(), 1, 1).unwrap().remove(0);
+        let key_pair = ttp_keygen(1, 1).unwrap().remove(0);
         let epoch = 1;
 
         let issuance = voucher_fixture(None);
         let sig_req = issuance.prepare_for_signing();
         let exp_date_sigs = generate_expiration_date_signatures(
-            params,
             sig_req.expiration_date,
             &[key_pair.secret_key()],
             &vec![key_pair.verification_key()],
@@ -1780,7 +1760,6 @@ mod credential_tests {
         .unwrap();
 
         let blind_sig = issue(
-            params.grp(),
             key_pair.secret_key(),
             sig_req.ecash_pub_key.clone(),
             &sig_req.withdrawal_request,
@@ -1808,7 +1787,7 @@ mod credential_tests {
         let issued2 = issuance.to_issued_credential(wallet, exp_date_sigs, epoch);
 
         let coin_indices_signatures = generate_coin_indices_signatures(
-            params,
+            ecash_parameters(),
             &[key_pair.secret_key()],
             &vec![key_pair.verification_key()],
             &key_pair.verification_key(),

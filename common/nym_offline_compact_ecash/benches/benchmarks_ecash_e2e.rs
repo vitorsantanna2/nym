@@ -11,15 +11,15 @@ use nym_compact_ecash::constants;
 use nym_compact_ecash::identify::{identify, IdentifyResult};
 
 use nym_compact_ecash::error::Result;
+use nym_compact_ecash::scheme::coin_indices_signatures::{
+    aggregate_indices_signatures, sign_coin_indices, CoinIndexSignature, PartialCoinIndexSignature,
+};
 use nym_compact_ecash::scheme::expiration_date_signatures::{
     aggregate_expiration_signatures, sign_expiration_date, ExpirationDateSignature,
     PartialExpirationDateSignature,
 };
 use nym_compact_ecash::scheme::keygen::SecretKeyAuth;
-use nym_compact_ecash::scheme::setup::{
-    aggregate_indices_signatures, setup, sign_coin_indices, CoinIndexSignature, Parameters,
-    PartialCoinIndexSignature,
-};
+use nym_compact_ecash::setup::Parameters;
 use nym_compact_ecash::{
     aggregate_verification_keys, aggregate_wallets, generate_keypair_user, issue, issue_verify,
     ttp_keygen, withdrawal_request, PartialWallet, PayInfo, PublicKeyUser, SecretKeyUser,
@@ -27,7 +27,6 @@ use nym_compact_ecash::{
 };
 
 pub fn generate_expiration_date_signatures(
-    params: &Parameters,
     expiration_date: u64,
     secret_keys_authorities: &[SecretKeyAuth],
     verification_keys_auth: &[VerificationKeyAuth],
@@ -54,7 +53,7 @@ pub fn generate_expiration_date_signatures(
         .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
         .collect();
 
-    aggregate_expiration_signatures(params, verification_key, expiration_date, &combined_data)
+    aggregate_expiration_signatures(verification_key, expiration_date, &combined_data)
 }
 
 pub fn generate_coin_indices_signatures(
@@ -93,7 +92,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
     // group.measurement_time(Duration::from_secs(1500));
 
     let expiration_date = 1703721600; // Dec 28 2023
-    let spend_date = Scalar::from(1701960386); // Dec 07 2023
+    let spend_date = Scalar::from(1701907200); // Dec 07 2023
 
     let case = BenchCase {
         num_authorities: 100,
@@ -104,12 +103,12 @@ fn bench_compact_ecash(c: &mut Criterion) {
     };
 
     // SETUP PHASE and KEY GENERATION
-    let params = setup(case.ll);
+    let params = Parameters::new(case.ll);
 
     let grp = params.grp();
-    let user_keypair = generate_keypair_user(grp);
+    let user_keypair = generate_keypair_user();
     let threshold = (case.threshold_p * case.num_authorities as f32).round() as u64;
-    let authorities_keypairs = ttp_keygen(grp, threshold, case.num_authorities).unwrap();
+    let authorities_keypairs = ttp_keygen(threshold, case.num_authorities).unwrap();
     let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
         .iter()
         .map(|keypair| keypair.secret_key())
@@ -126,7 +125,6 @@ fn bench_compact_ecash(c: &mut Criterion) {
     // PRE-GENERATION OF THE EXPORATION DATE SIGNATURES AND THE COIN INDICES SIGNATURES
     // generate valid dates signatures
     let dates_signatures = generate_expiration_date_signatures(
-        &params,
         expiration_date,
         &secret_keys_authorities,
         &verification_keys_auth,
@@ -146,8 +144,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
     .unwrap();
 
     // ISSUANCE PHASE
-    let (req, req_info) =
-        withdrawal_request(grp, &user_keypair.secret_key(), expiration_date).unwrap();
+    let (req, req_info) = withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
 
     // CLIENT BENCHMARK: prepare a single withdrawal request
     group.bench_function(
@@ -155,9 +152,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
             "[Client] withdrawal_request_{}_authorities_{}_L_{}_threshold",
             case.num_authorities, case.ll, case.threshold_p,
         ),
-        |b| {
-            b.iter(|| withdrawal_request(grp, &user_keypair.secret_key(), expiration_date).unwrap())
-        },
+        |b| b.iter(|| withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap()),
     );
 
     // ISSUING AUTHRORITY BENCHMARK: Benchmark the issue function
@@ -172,7 +167,6 @@ fn bench_compact_ecash(c: &mut Criterion) {
         |b| {
             b.iter(|| {
                 issue(
-                    grp,
                     keypair.secret_key(),
                     user_keypair.public_key(),
                     &req,
@@ -185,7 +179,6 @@ fn bench_compact_ecash(c: &mut Criterion) {
     let mut wallet_blinded_signatures = Vec::new();
     for auth_keypair in &authorities_keypairs {
         let blind_signature = issue(
-            grp,
             auth_keypair.secret_key(),
             user_keypair.public_key(),
             &req,
@@ -199,7 +192,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
     let vk = verification_keys_auth.first().unwrap();
     group.bench_function(
         &format!("[Client] issue_verify_a_partial_wallet_with_L_{}", case.ll,),
-        |b| b.iter(|| issue_verify(grp, vk, &user_keypair.secret_key(), w, &req_info, 1).unwrap()),
+        |b| b.iter(|| issue_verify(vk, &user_keypair.secret_key(), w, &req_info, 1).unwrap()),
     );
 
     let unblinded_wallet_shares: Vec<PartialWallet> = izip!(
@@ -208,15 +201,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
     )
     .enumerate()
     .map(|(idx, (w, vk))| {
-        issue_verify(
-            grp,
-            vk,
-            &user_keypair.secret_key(),
-            w,
-            &req_info,
-            idx as u64 + 1,
-        )
-        .unwrap()
+        issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
     })
     .collect();
 
@@ -229,7 +214,6 @@ fn bench_compact_ecash(c: &mut Criterion) {
         |b| {
             b.iter(|| {
                 aggregate_wallets(
-                    grp,
                     &verification_key,
                     &user_keypair.secret_key(),
                     &unblinded_wallet_shares,
@@ -242,7 +226,6 @@ fn bench_compact_ecash(c: &mut Criterion) {
 
     // Aggregate partial wallets
     let aggr_wallet = aggregate_wallets(
-        grp,
         &verification_key,
         &user_keypair.secret_key(),
         &unblinded_wallet_shares,
@@ -302,7 +285,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
         |b| {
             b.iter(|| {
                 payment
-                    .spend_verify(&params, &verification_key, &pay_info, spend_date)
+                    .spend_verify(&verification_key, &pay_info, spend_date)
                     .unwrap()
             })
         },
@@ -337,7 +320,7 @@ fn bench_compact_ecash(c: &mut Criterion) {
     for _ in 0..case.case_nr_pub_keys {
         let sk = grp.random_scalar();
         let sk_user = SecretKeyUser::from_bytes(&sk.to_bytes()).unwrap();
-        let pk_user = sk_user.public_key(grp);
+        let pk_user = sk_user.public_key();
         public_keys.push(pk_user);
     }
     public_keys.push(user_keypair.public_key());

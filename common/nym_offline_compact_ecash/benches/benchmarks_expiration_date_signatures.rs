@@ -9,16 +9,13 @@ use nym_compact_ecash::scheme::expiration_date_signatures::{
 use criterion::{criterion_group, criterion_main, Criterion};
 use nym_compact_ecash::constants;
 use nym_compact_ecash::scheme::keygen::SecretKeyAuth;
-use nym_compact_ecash::setup::setup;
 use nym_compact_ecash::{aggregate_verification_keys, ttp_keygen, VerificationKeyAuth};
 
 fn bench_partial_sign_expiration_date(c: &mut Criterion) {
     let mut group = c.benchmark_group("benchmark-sign-verify-expiration-date");
-    let ll = 32;
-    let params = setup(ll);
     let expiration_date = 1703183958;
 
-    let authorities_keys = ttp_keygen(params.grp(), 2, 3).unwrap();
+    let authorities_keys = ttp_keygen(2, 3).unwrap();
     let sk_i_auth = authorities_keys[0].secret_key();
     let vk_i_auth = authorities_keys[0].verification_key();
     let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date);
@@ -33,35 +30,21 @@ fn bench_partial_sign_expiration_date(c: &mut Criterion) {
     );
 
     // CLIENT: verify the correctness of the set of (partial) signatures for a given expiration date
-    assert!(
-        verify_valid_dates_signatures(&params, &vk_i_auth, &partial_exp_sig, expiration_date)
-            .is_ok()
-    );
+    assert!(verify_valid_dates_signatures(&vk_i_auth, &partial_exp_sig, expiration_date).is_ok());
     group.bench_function(
         &format!(
             "[Client] verify_valid_dates_signatures_{}_validity_period",
             constants::CRED_VALIDITY_PERIOD,
         ),
-        |b| {
-            b.iter(|| {
-                verify_valid_dates_signatures(
-                    &params,
-                    &vk_i_auth,
-                    &partial_exp_sig,
-                    expiration_date,
-                )
-            })
-        },
+        |b| b.iter(|| verify_valid_dates_signatures(&vk_i_auth, &partial_exp_sig, expiration_date)),
     );
 }
 
 fn bench_aggregate_expiration_date_signatures(c: &mut Criterion) {
     let mut group = c.benchmark_group("benchmark-aggregate-verify-expiration-date-signatures");
-    let ll = 32;
-    let params = setup(ll);
     let expiration_date = 1703183958;
 
-    let authorities_keypairs = ttp_keygen(params.grp(), 7, 10).unwrap();
+    let authorities_keypairs = ttp_keygen(7, 10).unwrap();
     let indices: [u64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     // list of secret keys of each authority
     let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
@@ -103,7 +86,6 @@ fn bench_aggregate_expiration_date_signatures(c: &mut Criterion) {
         |b| {
             b.iter(|| {
                 aggregate_expiration_signatures(
-                    &params,
                     &verification_key,
                     expiration_date,
                     &combined_data,

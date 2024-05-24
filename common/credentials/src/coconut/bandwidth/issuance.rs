@@ -4,16 +4,14 @@
 use crate::coconut::bandwidth::freepass::FreePassIssuanceData;
 use crate::coconut::bandwidth::issued::IssuedBandwidthCredential;
 use crate::coconut::bandwidth::voucher::BandwidthVoucherIssuanceData;
-use crate::coconut::bandwidth::{
-    bandwidth_credential_params, CredentialSigningData, CredentialType,
-};
+use crate::coconut::bandwidth::{CredentialSigningData, CredentialType};
 use crate::coconut::utils::{cred_exp_date_timestamp, freepass_exp_date_timestamp};
 use crate::error::Error;
 use log::error;
 use nym_credentials_interface::{
-    aggregate_wallets, constants, generate_keypair_user, generate_keypair_user_from_seed,
-    issue_verify, setup, withdrawal_request, BlindedSignature, ExpirationDateSignature,
-    KeyPairUser, Parameters, PartialWallet, VerificationKeyAuth, Wallet,
+    aggregate_wallets, generate_keypair_user, generate_keypair_user_from_seed, issue_verify,
+    withdrawal_request, BlindedSignature, ExpirationDateSignature, KeyPairUser, PartialWallet,
+    VerificationKeyAuth, Wallet,
 };
 use nym_crypto::asymmetric::identity;
 use nym_validator_client::nym_api::EpochId;
@@ -64,21 +62,16 @@ pub struct IssuanceBandwidthCredential {
 }
 
 impl IssuanceBandwidthCredential {
-    pub fn default_parameters() -> Parameters {
-        setup(constants::NB_TICKETS)
-    }
-
     pub fn new<B: Into<BandwidthCredentialIssuanceDataVariant>>(
         variant_data: B,
         identifier: Option<&[u8]>,
         expiration_date: u64,
     ) -> Self {
         let variant_data = variant_data.into();
-        let params = bandwidth_credential_params().grp();
         let ecash_keypair = if let Some(id) = identifier {
-            generate_keypair_user_from_seed(params, id)
+            generate_keypair_user_from_seed(id)
         } else {
-            generate_keypair_user(params)
+            generate_keypair_user()
         };
 
         IssuanceBandwidthCredential {
@@ -151,16 +144,10 @@ impl IssuanceBandwidthCredential {
     }
 
     pub fn prepare_for_signing(&self) -> CredentialSigningData {
-        let params = bandwidth_credential_params();
-
         // safety: the creation of the request can only fail if one provided invalid parameters
         // and we created then specific to this type of the credential so the unwrap is fine
-        let (withdrawal_request, request_info) = withdrawal_request(
-            params.grp(),
-            &self.ecash_keypair.secret_key(),
-            self.expiration_date,
-        )
-        .unwrap();
+        let (withdrawal_request, request_info) =
+            withdrawal_request(&self.ecash_keypair.secret_key(), self.expiration_date).unwrap();
 
         CredentialSigningData {
             withdrawal_request,
@@ -178,9 +165,7 @@ impl IssuanceBandwidthCredential {
         blinded_signature: BlindedSignature,
         signer_index: u64,
     ) -> Result<PartialWallet, Error> {
-        let params = bandwidth_credential_params().grp();
         let unblinded_signature = issue_verify(
-            params,
             validator_vk,
             &self.ecash_keypair.secret_key(),
             &blinded_signature,
@@ -242,9 +227,7 @@ impl IssuanceBandwidthCredential {
         shares: &[PartialWallet],
         signing_data: CredentialSigningData,
     ) -> Result<Wallet, Error> {
-        let params = bandwidth_credential_params().grp();
         aggregate_wallets(
-            params,
             verification_key,
             &self.ecash_keypair.secret_key(),
             shares,

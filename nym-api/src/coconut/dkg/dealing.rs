@@ -476,7 +476,7 @@ pub(crate) mod tests {
     };
     use crate::coconut::tests::helpers::unchecked_decode_bte_key;
     use nym_coconut_dkg_common::types::DealerRegistrationDetails;
-    use nym_compact_ecash::{setup::GroupParameters, ttp_keygen};
+    use nym_compact_ecash::ttp_keygen;
     use nym_dkg::bte::PublicKeyWithProof;
 
     #[tokio::test]
@@ -619,7 +619,7 @@ pub(crate) mod tests {
 
         let epoch = 1;
 
-        let mut keys = ttp_keygen(&GroupParameters::new(), 3, 4).unwrap();
+        let mut keys = ttp_keygen(3, 4).unwrap();
         let coconut_keypair = KeyPair::new();
         coconut_keypair
             .set(KeyPairWithEpoch::new(keys.pop().unwrap(), epoch))
@@ -676,7 +676,7 @@ pub(crate) mod tests {
 
         let epoch = 1;
 
-        let mut keys = ttp_keygen(&GroupParameters::new(), 3, 4).unwrap();
+        let mut keys = ttp_keygen(3, 4).unwrap();
         let coconut_keypair = KeyPair::new();
         coconut_keypair
             .set(KeyPairWithEpoch::new(keys.pop().unwrap(), epoch - 1))

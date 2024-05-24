@@ -7,10 +7,10 @@ use bls12_381::{G1Projective, Scalar};
 use group::GroupEncoding;
 use itertools::izip;
 
+use crate::ecash_group_parameters;
 use crate::error::{CompactEcashError, Result};
 use crate::proofs::{compute_challenge, produce_response, produce_responses, ChallengeDigest};
 use crate::scheme::keygen::PublicKeyUser;
-use crate::scheme::setup::GroupParameters;
 use crate::utils::{
     try_deserialize_g1_projective, try_deserialize_scalar, try_deserialize_scalar_vec,
 };
@@ -141,10 +141,10 @@ pub struct WithdrawalReqProof {
 
 impl WithdrawalReqProof {
     pub(crate) fn construct(
-        params: &GroupParameters,
         instance: &WithdrawalReqInstance,
         witness: &WithdrawalReqWitness,
     ) -> Self {
+        let params = ecash_group_parameters();
         // generate random values to replace the witnesses
         let r_com_opening = params.random_scalar();
         let r_pedcom_openings = params.n_random_scalars(witness.private_attributes_openings.len());
@@ -216,11 +216,8 @@ impl WithdrawalReqProof {
         }
     }
 
-    pub(crate) fn verify(
-        &self,
-        params: &GroupParameters,
-        instance: &WithdrawalReqInstance,
-    ) -> bool {
+    pub(crate) fn verify(&self, instance: &WithdrawalReqInstance) -> bool {
+        let params = ecash_group_parameters();
         // recompute zk commitments for each instance
         let zkcm_com = instance.joined_commitment * self.challenge
             + params.gen1() * self.response_opening
@@ -367,14 +364,15 @@ mod tests {
     use group::Group;
     use rand::thread_rng;
 
-    use crate::utils::hash_g1;
+    use crate::GroupParameters;
+    use crate::{constants, utils::hash_g1};
 
     use super::*;
 
     #[test]
     fn withdrawal_request_instance_roundtrip() {
         let mut rng = thread_rng();
-        let params = GroupParameters::new();
+        let params = GroupParameters::new(constants::ATTRIBUTES_LEN);
         let instance = WithdrawalReqInstance {
             joined_commitment: G1Projective::random(&mut rng),
             joined_commitment_hash: G1Projective::random(&mut rng),
@@ -396,7 +394,7 @@ mod tests {
     #[test]
     fn withdrawal_proof_construct_and_verify() {
         let _rng = thread_rng();
-        let params = GroupParameters::new();
+        let params = GroupParameters::new(constants::ATTRIBUTES_LEN);
         let sk = params.random_scalar();
         let pk_user = PublicKeyUser {
             pk: params.gen1() * sk,
@@ -433,7 +431,7 @@ mod tests {
             joined_commitment_opening,
             private_attributes_openings,
         };
-        let zk_proof = WithdrawalReqProof::construct(&params, &instance, &witness);
-        assert!(zk_proof.verify(&params, &instance))
+        let zk_proof = WithdrawalReqProof::construct(&instance, &witness);
+        assert!(zk_proof.verify(&instance))
     }
 }

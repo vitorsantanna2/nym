@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{CompactEcashError, Result};
 use crate::scheme::aggregation::aggregate_verification_keys;
-use crate::scheme::setup::GroupParameters;
 use crate::scheme::SignerIndex;
 use crate::traits::Bytable;
 use crate::utils::{hash_to_scalar, Polynomial};
@@ -22,7 +21,7 @@ use crate::utils::{
     try_deserialize_g1_projective, try_deserialize_g2_projective, try_deserialize_scalar,
     try_deserialize_scalar_vec,
 };
-use crate::Base58;
+use crate::{ecash_group_parameters, Base58};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[derive(Debug, PartialEq, Clone, Zeroize, ZeroizeOnDrop)]
@@ -116,7 +115,8 @@ impl SecretKeyAuth {
         self.ys.get(i)
     }
 
-    pub fn verification_key(&self, params: &GroupParameters) -> VerificationKeyAuth {
+    pub fn verification_key(&self) -> VerificationKeyAuth {
+        let params = ecash_group_parameters();
         let g1 = params.gen1();
         let g2 = params.gen2();
         VerificationKeyAuth {
@@ -406,9 +406,9 @@ pub struct SecretKeyUser {
 }
 
 impl SecretKeyUser {
-    pub fn public_key(&self, params: &GroupParameters) -> PublicKeyUser {
+    pub fn public_key(&self) -> PublicKeyUser {
         PublicKeyUser {
-            pk: params.gen1() * self.sk,
+            pk: ecash_group_parameters().gen1() * self.sk,
         }
     }
 
@@ -576,7 +576,8 @@ impl KeyPairUser {
     }
 }
 
-pub fn generate_keypair_user(params: &GroupParameters) -> KeyPairUser {
+pub fn generate_keypair_user() -> KeyPairUser {
+    let params = ecash_group_parameters();
     let sk_user = SecretKeyUser {
         sk: params.random_scalar(),
     };
@@ -590,7 +591,8 @@ pub fn generate_keypair_user(params: &GroupParameters) -> KeyPairUser {
     }
 }
 
-pub fn generate_keypair_user_from_seed(params: &GroupParameters, seed: &[u8]) -> KeyPairUser {
+pub fn generate_keypair_user_from_seed(seed: &[u8]) -> KeyPairUser {
+    let params = ecash_group_parameters();
     let sk_user = SecretKeyUser {
         sk: hash_to_scalar(seed),
     };
@@ -604,11 +606,8 @@ pub fn generate_keypair_user_from_seed(params: &GroupParameters, seed: &[u8]) ->
     }
 }
 
-pub fn ttp_keygen(
-    params: &GroupParameters,
-    threshold: u64,
-    num_authorities: u64,
-) -> Result<Vec<KeyPairAuth>> {
+pub fn ttp_keygen(threshold: u64, num_authorities: u64) -> Result<Vec<KeyPairAuth>> {
+    let params = ecash_group_parameters();
     if threshold == 0 {
         return Err(CompactEcashError::KeygenParameters);
     }
@@ -645,7 +644,7 @@ pub fn ttp_keygen(
     let keypairs = secret_keys
         .zip(polynomial_indices.iter())
         .map(|(secret_key, index)| {
-            let verification_key = secret_key.verification_key(params);
+            let verification_key = secret_key.verification_key();
             KeyPairAuth {
                 secret_key,
                 verification_key,

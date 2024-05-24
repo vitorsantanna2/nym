@@ -19,7 +19,6 @@ use nym_api_requests::coconut::{
 use nym_coconut_dkg_common::types::EpochId;
 use nym_compact_ecash::error::CompactEcashError;
 use nym_compact_ecash::identify::IdentifyResult;
-use nym_credentials::coconut::bandwidth::bandwidth_credential_params;
 use nym_credentials::coconut::utils::{
     cred_exp_date_timestamp, freepass_exp_date_timestamp, today_timestamp,
 };
@@ -302,9 +301,8 @@ pub async fn verify_online_credential(
     }
 
     let verification_key = state.verification_key(credential_data.epoch_id).await?;
-    let params = bandwidth_credential_params();
 
-    if credential_data.verify(params, &verification_key).is_err() {
+    if credential_data.verify(&verification_key).is_err() {
         state.refuse_proposal_online(proposal_id).await;
         return Ok(Json(VerifyEcashCredentialResponse::Refused));
     }
@@ -417,9 +415,8 @@ pub async fn verify_offline_credential(
 
     let epoch_id = credential_data.epoch_id;
     let verification_key = state.verification_key(epoch_id).await?;
-    let params = bandwidth_credential_params();
 
-    if credential_data.verify(params, &verification_key).is_err() {
+    if credential_data.verify(&verification_key).is_err() {
         state.refuse_proposal(proposal_id).await;
         return Ok(Json(VerifyEcashCredentialResponse::Refused));
     }

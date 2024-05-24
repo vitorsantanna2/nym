@@ -9,7 +9,6 @@ use futures::StreamExt;
 use log::{error, info};
 use nym_coconut_dkg_common::types::EpochId;
 use nym_credential_utils::utils::block_until_coconut_is_available;
-use nym_credentials::coconut::bandwidth::bandwidth_credential_params;
 use nym_credentials::coconut::utils::freepass_exp_date_timestamp;
 use nym_credentials::coconut::utils::today_timestamp;
 use nym_credentials::{
@@ -132,12 +131,8 @@ async fn get_freepass(
         bail!("we managed to obtain only {} partial expiration date signatures while the minimum threshold is {threshold}", signatures_shares.len());
     }
 
-    let exp_date_sigs = aggregate_expiration_signatures(
-        bandwidth_credential_params(),
-        aggregate_vk,
-        expiration_date_ts,
-        &signatures_shares,
-    )?;
+    let exp_date_sigs =
+        aggregate_expiration_signatures(aggregate_vk, expiration_date_ts, &signatures_shares)?;
     Ok(issuance_pass.into_issued_credential(wallet, exp_date_sigs, epoch_id))
 }
 

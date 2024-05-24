@@ -3,14 +3,13 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::coconut::error::CoconutError;
-use crate::coconut::state::bandwidth_credential_params;
 use nym_api_requests::coconut::models::FreePassRequest;
 use nym_api_requests::coconut::BlindSignRequestBody;
+use nym_compact_ecash::scheme::coin_indices_signatures::{sign_coin_indices, CoinIndexSignature};
 use nym_compact_ecash::scheme::expiration_date_signatures::{
     sign_expiration_date, ExpirationDateSignature,
 };
 use nym_compact_ecash::scheme::keygen::SecretKeyAuth;
-use nym_compact_ecash::setup::{sign_coin_indices, CoinIndexSignature, Parameters};
 use nym_compact_ecash::utils::BlindedSignature;
 use nym_compact_ecash::{PublicKeyUser, VerificationKeyAuth, WithdrawalRequest};
 use nym_ecash_contract_common::events::BLACKLIST_PROPOSAL_ID;
@@ -71,7 +70,6 @@ pub(crate) fn blind_sign<C: CredentialRequest>(
     signing_key: &SecretKeyAuth,
 ) -> Result<BlindedSignature, CoconutError> {
     Ok(nym_compact_ecash::scheme::withdrawal::issue(
-        bandwidth_credential_params().grp(),
         signing_key.clone(),
         request.ecash_pubkey().clone(),
         request.withdrawal_request(),
@@ -108,7 +106,6 @@ impl CoinIndexSignatureCache {
     pub(crate) async fn refresh_signatures(
         &self,
         expected_epoch_id: u64,
-        ecash_parameters: &Parameters,
         verification_key: &VerificationKeyAuth,
         secret_key: &SecretKeyAuth,
     ) -> Vec<CoinIndexSignature> {
@@ -119,7 +116,7 @@ impl CoinIndexSignatureCache {
         // (this check can spare us some signing)
         if self.epoch_id.load(Ordering::Relaxed) != expected_epoch_id {
             *signatures = Some(sign_coin_indices(
-                ecash_parameters,
+                nym_compact_ecash::ecash_parameters(),
                 verification_key,
                 secret_key,
             ));

@@ -1,100 +1,33 @@
 // Copyright 2024 - Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::constants;
-use crate::error::Result;
-
-use crate::scheme::expiration_date_signatures::{
-    aggregate_expiration_signatures, sign_expiration_date, ExpirationDateSignature,
-    PartialExpirationDateSignature,
-};
-use crate::scheme::keygen::{SecretKeyAuth, VerificationKeyAuth};
-use crate::scheme::setup::{
-    aggregate_indices_signatures, sign_coin_indices, CoinIndexSignature, Parameters,
-    PartialCoinIndexSignature,
-};
-
-pub fn generate_expiration_date_signatures(
-    params: &Parameters,
-    expiration_date: u64,
-    secret_keys_authorities: &[SecretKeyAuth],
-    verification_keys_auth: &[VerificationKeyAuth],
-    verification_key: &VerificationKeyAuth,
-    indices: &[u64],
-) -> Result<Vec<ExpirationDateSignature>> {
-    let mut edt_partial_signatures: Vec<Vec<PartialExpirationDateSignature>> =
-        Vec::with_capacity(constants::CRED_VALIDITY_PERIOD as usize);
-    for sk_auth in secret_keys_authorities.iter() {
-        let sign = sign_expiration_date(sk_auth, expiration_date);
-        edt_partial_signatures.push(sign);
-    }
-    let combined_data: Vec<(
-        u64,
-        VerificationKeyAuth,
-        Vec<PartialExpirationDateSignature>,
-    )> = indices
-        .iter()
-        .zip(
-            verification_keys_auth
-                .iter()
-                .zip(edt_partial_signatures.iter()),
-        )
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
-        .collect();
-
-    aggregate_expiration_signatures(params, verification_key, expiration_date, &combined_data)
-}
-
-pub fn generate_coin_indices_signatures(
-    params: &Parameters,
-    secret_keys_authorities: &[SecretKeyAuth],
-    verification_keys_auth: &[VerificationKeyAuth],
-    verification_key: &VerificationKeyAuth,
-    indices: &[u64],
-) -> Result<Vec<CoinIndexSignature>> {
-    // create the partial signatures from each authority
-    let partial_signatures: Vec<Vec<PartialCoinIndexSignature>> = secret_keys_authorities
-        .iter()
-        .map(|sk_auth| sign_coin_indices(params, verification_key, sk_auth))
-        .collect();
-
-    let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> = indices
-        .iter()
-        .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
-        .collect();
-
-    aggregate_indices_signatures(params, verification_key, &combined_data)
-}
-
 #[cfg(test)]
 mod tests {
-    use itertools::izip;
-
     use crate::error::Result;
     use crate::scheme::aggregation::{aggregate_verification_keys, aggregate_wallets};
     use crate::scheme::keygen::{
         generate_keypair_user, ttp_keygen, SecretKeyAuth, VerificationKeyAuth,
     };
-    use crate::scheme::setup::setup;
     use crate::scheme::withdrawal::{issue, issue_verify, withdrawal_request, WithdrawalRequest};
-    use crate::scheme::PayInfo;
-    use crate::scheme::{PartialWallet, Payment, Wallet};
+    use crate::scheme::{PartialWallet, PayInfo, Payment, Wallet};
+    use crate::setup::Parameters;
+    use crate::tests::helpers::{
+        generate_coin_indices_signatures, generate_expiration_date_signatures,
+    };
     use bls12_381::Scalar;
+    use itertools::izip;
 
-    use super::*;
     #[test]
     fn main() -> Result<()> {
         let total_coins = 32;
-        let params = setup(total_coins);
-        let grp_params = params.grp();
+        let params = Parameters::new(total_coins);
         // NOTE: Make sure that the date timestamp are calculated at 00:00:00!!
         let expiration_date = 1703721600; // Dec 28 2023 00:00:00
         let spend_date = Scalar::from(1701907200); // Dec 07 2023 00:00:00
-        let user_keypair = generate_keypair_user(grp_params);
+        let user_keypair = generate_keypair_user();
 
         // generate authorities keys
-        let authorities_keypairs = ttp_keygen(grp_params, 2, 3).unwrap();
+        let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
             .iter()
@@ -110,7 +43,6 @@ mod tests {
 
         // generate valid dates signatures
         let dates_signatures = generate_expiration_date_signatures(
-            &params,
             expiration_date,
             &secret_keys_authorities,
             &verification_keys_auth,
@@ -129,7 +61,7 @@ mod tests {
 
         // request a wallet
         let (req, req_info) =
-            withdrawal_request(grp_params, &user_keypair.secret_key(), expiration_date).unwrap();
+            withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
         let req_bytes = req.to_bytes();
         let req2 = WithdrawalRequest::try_from(req_bytes.as_slice()).unwrap();
         assert_eq!(req, req2);
@@ -138,7 +70,6 @@ mod tests {
         let mut wallet_blinded_signatures = Vec::new();
         for auth_keypair in authorities_keypairs {
             let blind_signature = issue(
-                grp_params,
                 auth_keypair.secret_key(),
                 user_keypair.public_key(),
                 &req,
@@ -153,15 +84,7 @@ mod tests {
         )
         .enumerate()
         .map(|(idx, (w, vk))| {
-            issue_verify(
-                grp_params,
-                vk,
-                &user_keypair.secret_key(),
-                w,
-                &req_info,
-                idx as u64 + 1,
-            )
-            .unwrap()
+            issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
         })
         .collect();
 
@@ -172,7 +95,6 @@ mod tests {
 
         // Aggregate partial wallets
         let aggr_wallet = aggregate_wallets(
-            grp_params,
             &verification_key,
             &user_keypair.secret_key(),
             &unblinded_wallet_shares,
@@ -202,7 +124,7 @@ mod tests {
         )?;
 
         assert!(payment
-            .spend_verify(&params, &verification_key, &pay_info, spend_date)
+            .spend_verify(&verification_key, &pay_info, spend_date)
             .unwrap());
 
         let payment_bytes = payment.to_bytes();

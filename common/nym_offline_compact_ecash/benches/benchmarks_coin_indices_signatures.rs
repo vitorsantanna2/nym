@@ -2,19 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use nym_compact_ecash::scheme::keygen::SecretKeyAuth;
-use nym_compact_ecash::setup::{
-    aggregate_indices_signatures, setup, sign_coin_indices, verify_coin_indices_signatures,
+use nym_compact_ecash::scheme::coin_indices_signatures::{
+    aggregate_indices_signatures, sign_coin_indices, verify_coin_indices_signatures,
     PartialCoinIndexSignature,
 };
+use nym_compact_ecash::scheme::keygen::SecretKeyAuth;
+use nym_compact_ecash::setup::Parameters;
 use nym_compact_ecash::{aggregate_verification_keys, ttp_keygen, VerificationKeyAuth};
 
 fn bench_coin_signing(c: &mut Criterion) {
     let mut group = c.benchmark_group("benchmark-sign-verify-coin-signing");
 
     let ll = 32;
-    let params = setup(ll);
-    let authorities_keypairs = ttp_keygen(params.grp(), 2, 3).unwrap();
+    let params = Parameters::new(ll);
+    let authorities_keypairs = ttp_keygen(2, 3).unwrap();
     let indices: [u64; 3] = [1, 2, 3];
 
     // Pick one authority to do the signing
@@ -71,8 +72,8 @@ fn bench_aggregate_coin_indices_signatures(c: &mut Criterion) {
     let mut group = c.benchmark_group("benchmark-aggregate-coin-signing");
 
     let ll = 32;
-    let params = setup(ll);
-    let authorities_keypairs = ttp_keygen(params.grp(), 7, 10).unwrap();
+    let params = Parameters::new(ll);
+    let authorities_keypairs = ttp_keygen(7, 10).unwrap();
     let indices: [u64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
     // list of secret keys of each authority

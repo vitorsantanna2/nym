@@ -19,7 +19,7 @@ use crate::utils::{
     SignerIndex,
 };
 use crate::utils::{BlindedSignature, Signature};
-use crate::{constants, Attribute, Base58};
+use crate::{constants, ecash_group_parameters, Attribute, Base58};
 
 /// Represents a withdrawal request generate by the client who wants to obtain a zk-nym credential.
 ///
@@ -395,7 +395,6 @@ fn compute_private_attribute_commitments(
 ///
 /// # Arguments
 ///
-/// * `params` - A reference to the group parameters used in the protocol.
 /// * `sk_user` - A reference to the user's secret key.
 /// * `expiration_date` - The expiration date for the withdrawal request.
 ///
@@ -416,19 +415,22 @@ fn compute_private_attribute_commitments(
 /// The associated `RequestInfo` includes information such as commitment hash, commitment opening,
 /// openings for private attributes, `v`, and the expiration date.
 pub fn withdrawal_request(
-    params: &GroupParameters,
     sk_user: &SecretKeyUser,
     expiration_date: u64,
 ) -> Result<(WithdrawalRequest, RequestInfo)> {
+    let params = ecash_group_parameters();
     // Generate random and unique wallet secret
     let v = params.random_scalar();
     let joined_commitment_opening = params.random_scalar();
     // Compute joined commitment for all attributes (public and private)
+    //SAFETY: params is static with length 3
+    #[allow(clippy::unwrap_used)]
     let joined_commitment: G1Projective = params.gen1() * joined_commitment_opening
         + params.gamma_idx(0).unwrap() * sk_user.sk
         + params.gamma_idx(1).unwrap() * v;
 
     // Compute commitment hash h
+    #[allow(clippy::unwrap_used)]
     let joined_commitment_hash = hash_g1(
         (joined_commitment + params.gamma_idx(2).unwrap() * Scalar::from(expiration_date))
             .to_bytes(),
@@ -454,7 +456,7 @@ pub fn withdrawal_request(
         joined_commitment_opening,
         private_attributes_openings: private_attributes_openings.clone(),
     };
-    let zk_proof = WithdrawalReqProof::construct(params, &instance, &witness);
+    let zk_proof = WithdrawalReqProof::construct(&instance, &witness);
 
     // Create and return WithdrawalRequest and RequestInfo
     Ok((
@@ -479,7 +481,6 @@ pub fn withdrawal_request(
 ///
 /// # Arguments
 ///
-/// * `params` - Group parameters used in the cryptographic operations.
 /// * `req` - The withdrawal request to be verified.
 /// * `pk_user` - Public key of the user associated with the withdrawal request.
 /// * `expiration_date` - Expiration date for the withdrawal request.
@@ -489,12 +490,14 @@ pub fn withdrawal_request(
 /// Returns `Ok(true)` if the verification is successful, otherwise returns an error
 /// with a specific message indicating the verification failure.
 pub fn request_verify(
-    params: &GroupParameters,
     req: &WithdrawalRequest,
     pk_user: PublicKeyUser,
     expiration_date: u64,
 ) -> Result<()> {
+    let params = ecash_group_parameters();
     // Verify the joined commitment hash
+    //SAFETY: params is static with length 3
+    #[allow(clippy::unwrap_used)]
     let expected_commitment_hash = hash_g1(
         (req.joined_commitment + params.gamma_idx(2).unwrap() * Scalar::from(expiration_date))
             .to_bytes(),
@@ -509,7 +512,7 @@ pub fn request_verify(
         private_attributes_commitments: req.private_attributes_commitments.clone(),
         pk_user,
     };
-    if !req.zk_proof.verify(params, &instance) {
+    if !req.zk_proof.verify(&instance) {
         return Err(CompactEcashError::WithdrawalRequestVerification);
     }
     Ok(())
@@ -552,7 +555,6 @@ fn sign_expiration_date(
 ///
 /// # Arguments
 ///
-/// * `params` - Group parameters used in the cryptographic operations.
 /// * `sk_auth` - Secret key of the signing authority.
 /// * `pk_user` - Public key of the user associated with the withdrawal request.
 /// * `withdrawal_req` - The withdrawal request to be signed.
@@ -563,14 +565,13 @@ fn sign_expiration_date(
 /// Returns a `BlindedSignature` if the issuance process is successful, otherwise returns an error
 /// with a specific message indicating the failure.
 pub fn issue(
-    params: &GroupParameters,
     sk_auth: SecretKeyAuth,
     pk_user: PublicKeyUser,
     withdrawal_req: &WithdrawalRequest,
     expiration_date: u64,
 ) -> Result<BlindedSignature> {
     // Verify the withdrawal request
-    request_verify(params, withdrawal_req, pk_user, expiration_date)?;
+    request_verify(withdrawal_req, pk_user, expiration_date)?;
     // Verify `sk_auth` is long enough
     if sk_auth.ys.len() < constants::ATTRIBUTES_LEN {
         return Err(CompactEcashError::KeyTooShort);
@@ -608,7 +609,6 @@ pub fn issue(
 ///
 /// # Arguments
 ///
-/// * `params` - Group parameters used in the cryptographic operations.
 /// * `vk_auth` - Verification key of the signing authority.
 /// * `sk_user` - Secret key of the user.
 /// * `blind_signature` - Blinded signature received from the authority.
@@ -620,13 +620,13 @@ pub fn issue(
 /// Returns a `PartialWallet` if the verification process is successful, otherwise returns an error
 /// with a specific message indicating the failure.
 pub fn issue_verify(
-    params: &GroupParameters,
     vk_auth: &VerificationKeyAuth,
     sk_user: &SecretKeyUser,
     blind_signature: &BlindedSignature,
     req_info: &RequestInfo,
     signer_index: SignerIndex,
 ) -> Result<PartialWallet> {
+    let params = ecash_group_parameters();
     // Verify the integrity of the response from the authority
     if req_info.joined_commitment_hash != blind_signature.0 {
         return Err(CompactEcashError::IssuanceVerification);
@@ -671,7 +671,6 @@ pub fn issue_verify(
 ///
 /// # Arguments
 ///
-/// * `params` - Group parameters used in the cryptographic operations.
 /// * `blind_sign_request` - A reference to the blind signature request signed by the client.
 /// * `public_attributes` - A reference to the public attributes included in the client's request.
 /// * `blind_sig` - A reference to the issued partial blinded signature to be verified.
@@ -690,12 +689,12 @@ pub fn issue_verify(
 /// is consistent with the verification key and commitments in the blind signature request.
 /// The function returns `true` if the partial blind signature is valid, and `false` otherwise.
 pub fn verify_partial_blind_signature(
-    params: &GroupParameters,
     private_attribute_commitments: &[G1Projective],
     public_attributes: &[&Attribute],
     blind_sig: &BlindedSignature,
     partial_verification_key: &VerificationKeyAuth,
 ) -> bool {
+    let params = ecash_group_parameters();
     let num_private_attributes = private_attribute_commitments.len();
     if num_private_attributes + public_attributes.len() > partial_verification_key.beta_g2.len() {
         return false;

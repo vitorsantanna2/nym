@@ -3,14 +3,13 @@
 
 use crate::error::{CompactEcashError, Result};
 use crate::scheme::keygen::{SecretKeyAuth, VerificationKeyAuth};
-use crate::scheme::setup::{GroupParameters, Parameters};
 use crate::traits::Bytable;
 use crate::utils::hash_g1;
 use crate::utils::{
     check_bilinear_pairing, generate_lagrangian_coefficients_at_origin,
     try_deserialize_g1_projective,
 };
-use crate::{constants, Base58};
+use crate::{constants, ecash_group_parameters, Base58};
 use bls12_381::{G1Projective, G2Prepared, G2Projective, Scalar};
 use group::Curve;
 use itertools::Itertools;
@@ -36,7 +35,8 @@ impl ExpirationDateSignature {
     /// # Returns
     ///
     /// A tuple containing the randomized expiration date signature and the blinding scalar.
-    pub fn randomise(&self, params: &GroupParameters) -> (ExpirationDateSignature, Scalar) {
+    pub fn randomise(&self) -> (ExpirationDateSignature, Scalar) {
+        let params = ecash_group_parameters();
         // Generate random blinding scalars
         let r = params.random_scalar();
         let r_prime = params.random_scalar();
@@ -175,7 +175,6 @@ pub fn sign_expiration_date(
 ///
 /// # Arguments
 ///
-/// * `params` - The cryptographic parameters used in the signing process.
 /// * `vkey` - The verification key of the signing authority.
 /// * `signatures` - The list of date signatures to be verified.
 /// * `expiration_date` - The expiration date for which signatures are being issued (as unix timestamp).
@@ -185,11 +184,11 @@ pub fn sign_expiration_date(
 /// Returns `Ok(true)` if all signatures are verified successfully, otherwise returns an error
 ///
 pub fn verify_valid_dates_signatures(
-    params: &Parameters,
     vk: &VerificationKeyAuth,
     signatures: &[ExpirationDateSignature],
     expiration_date: u64,
 ) -> Result<()> {
+    let grp_params = ecash_group_parameters();
     let m0: Scalar = Scalar::from(expiration_date);
     let m2: Scalar = constants::TYPE_EXP;
 
@@ -215,7 +214,7 @@ pub fn verify_valid_dates_signatures(
             &sig.h.to_affine(),
             &G2Prepared::from((vk.alpha + partially_signed_attributes).to_affine()),
             &sig.s.to_affine(),
-            params.grp().prepared_miller_g2(),
+            grp_params.prepared_miller_g2(),
         ) {
             return Err(CompactEcashError::ExpirationDateSignatureVerification);
         }
@@ -227,7 +226,6 @@ pub fn verify_valid_dates_signatures(
 ///
 /// # Arguments
 ///
-/// * `params` - The cryptographic parameters used in the signing process.
 /// * `vk_auth` - The global verification key.
 /// * `expiration_date` - The expiration date for which the signatures are being aggregated (as unix timestamp).
 /// * `signatures` - A list of tuples containing unique indices, verification keys, and partial expiration date signatures corresponding to the signing authorities.
@@ -250,7 +248,6 @@ pub fn verify_valid_dates_signatures(
 /// This can occur if the cryptographic verification process fails for any of the provided signatures.
 ///
 pub fn aggregate_expiration_signatures(
-    params: &Parameters,
     vk: &VerificationKeyAuth,
     expiration_date: u64,
     signatures: &[(
@@ -282,7 +279,7 @@ pub fn aggregate_expiration_signatures(
     signatures
         .par_iter()
         .try_for_each(|(_, vk_auth, partial_signatures)| {
-            verify_valid_dates_signatures(params, vk_auth, partial_signatures, expiration_date)
+            verify_valid_dates_signatures(vk_auth, partial_signatures, expiration_date)
         })?;
 
     // Pre-allocate vectors
@@ -316,7 +313,7 @@ pub fn aggregate_expiration_signatures(
         let aggr_sig = ExpirationDateSignature { h, s: aggr_s };
         aggregated_date_signatures.push(aggr_sig);
     }
-    verify_valid_dates_signatures(params, vk, &aggregated_date_signatures, expiration_date)?;
+    verify_valid_dates_signatures(vk, &aggregated_date_signatures, expiration_date)?;
     Ok(aggregated_date_signatures)
 }
 
@@ -371,7 +368,6 @@ mod tests {
     use super::*;
     use crate::scheme::aggregation::aggregate_verification_keys;
     use crate::scheme::keygen::ttp_keygen;
-    use crate::scheme::setup::setup;
 
     #[test]
     fn test_find_index() {
@@ -394,31 +390,23 @@ mod tests {
 
     #[test]
     fn test_sign_expiration_date() {
-        let total_coins = 32;
-        let params = setup(total_coins);
         let expiration_date = 1702050209; // Dec 8 2023
 
-        let authorities_keys = ttp_keygen(params.grp(), 2, 3).unwrap();
+        let authorities_keys = ttp_keygen(2, 3).unwrap();
         let sk_i_auth = authorities_keys[0].secret_key();
         let vk_i_auth = authorities_keys[0].verification_key();
         let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date);
 
-        assert!(verify_valid_dates_signatures(
-            &params,
-            &vk_i_auth,
-            &partial_exp_sig,
-            expiration_date
-        )
-        .is_ok());
+        assert!(
+            verify_valid_dates_signatures(&vk_i_auth, &partial_exp_sig, expiration_date).is_ok()
+        );
     }
 
     #[test]
     fn test_aggregate_expiration_signatures() {
-        let total_coins = 32;
-        let params = setup(total_coins);
         let expiration_date = 1702050209; // Dec 8 2023
 
-        let authorities_keypairs = ttp_keygen(params.grp(), 2, 3).unwrap();
+        let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         // list of secret keys of each authority
         let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
@@ -456,7 +444,6 @@ mod tests {
             .collect();
 
         assert!(aggregate_expiration_signatures(
-            &params,
             &verification_key,
             expiration_date,
             &combined_data,

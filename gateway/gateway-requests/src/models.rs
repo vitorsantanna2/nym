@@ -283,12 +283,11 @@ impl OldCredentialSpendingRequest {
 mod tests {
     use super::*;
     use nym_compact_ecash::{
-        identify::{generate_coin_indices_signatures, generate_expiration_date_signatures},
-        issue, ttp_keygen, PayInfo,
+        issue,
+        tests::helpers::{generate_coin_indices_signatures, generate_expiration_date_signatures},
+        ttp_keygen, PayInfo,
     };
-    use nym_credentials::coconut::{
-        bandwidth::bandwidth_credential_params, utils::freepass_exp_date_timestamp,
-    };
+    use nym_credentials::coconut::utils::freepass_exp_date_timestamp;
     use nym_credentials::IssuanceBandwidthCredential;
     use nym_credentials_interface::{
         prove_bandwidth_credential, Attribute, CoconutBase58, CoconutParameters, CoconutSignature,
@@ -348,13 +347,11 @@ mod tests {
     #[test]
     fn credential_roundtrip() {
         // make valid request
-        let params = bandwidth_credential_params();
-        let keypair = ttp_keygen(params.grp(), 1, 1).unwrap().remove(0);
+        let keypair = ttp_keygen(1, 1).unwrap().remove(0);
 
         let issuance = IssuanceBandwidthCredential::new_freepass(freepass_exp_date_timestamp());
         let sig_req = issuance.prepare_for_signing();
         let exp_date_sigs = generate_expiration_date_signatures(
-            params,
             sig_req.expiration_date,
             &[keypair.secret_key()],
             &vec![keypair.verification_key()],
@@ -363,7 +360,6 @@ mod tests {
         )
         .unwrap();
         let blind_sig = issue(
-            params.grp(),
             keypair.secret_key(),
             sig_req.ecash_pub_key.clone(),
             &sig_req.withdrawal_request,
@@ -386,7 +382,7 @@ mod tests {
 
         let issued = issuance.into_issued_credential(wallet, exp_date_sigs, 1);
         let coin_indices_signatures = generate_coin_indices_signatures(
-            params,
+            nym_credentials_interface::ecash_parameters(),
             &[keypair.secret_key()],
             &vec![keypair.verification_key()],
             &keypair.verification_key(),

@@ -11,14 +11,13 @@ use itertools::Itertools;
 
 use crate::error::{CompactEcashError, Result};
 use crate::scheme::keygen::{SecretKeyUser, VerificationKeyAuth};
-use crate::scheme::setup::GroupParameters;
 use crate::scheme::withdrawal::RequestInfo;
 use crate::scheme::{PartialWallet, Wallet};
 use crate::utils::{
     check_bilinear_pairing, perform_lagrangian_interpolation_at_origin, PartialSignature,
     Signature, SignatureShare, SignerIndex,
 };
-use crate::Attribute;
+use crate::{ecash_group_parameters, Attribute};
 
 pub(crate) trait Aggregatable: Sized {
     fn aggregate(aggregatable: &[Self], indices: Option<&[SignerIndex]>) -> Result<Self>;
@@ -84,7 +83,6 @@ pub fn aggregate_verification_keys(
 }
 
 pub fn aggregate_signature_shares(
-    params: &GroupParameters,
     verification_key: &VerificationKeyAuth,
     attributes: &[Attribute],
     shares: &[SignatureShare],
@@ -94,22 +92,16 @@ pub fn aggregate_signature_shares(
         .map(|share| (*share.signature(), share.index()))
         .unzip();
 
-    aggregate_signatures(
-        params,
-        verification_key,
-        attributes,
-        &signatures,
-        Some(&indices),
-    )
+    aggregate_signatures(verification_key, attributes, &signatures, Some(&indices))
 }
 
 pub fn aggregate_signatures(
-    params: &GroupParameters,
     verification_key: &VerificationKeyAuth,
     attributes: &[Attribute],
     signatures: &[PartialSignature],
     indices: Option<&[SignerIndex]>,
 ) -> Result<Signature> {
+    let params = ecash_group_parameters();
     // aggregate the signature
 
     let signature = match Aggregatable::aggregate(signatures, indices) {
@@ -136,7 +128,6 @@ pub fn aggregate_signatures(
 }
 
 pub fn aggregate_wallets(
-    params: &GroupParameters,
     verification_key: &VerificationKeyAuth,
     sk_user: &SecretKeyUser,
     wallets: &[PartialWallet],
@@ -154,7 +145,7 @@ pub fn aggregate_wallets(
         *req_info.get_expiration_date(),
     ];
     let aggregated_signature =
-        aggregate_signature_shares(params, verification_key, &attributes, &signature_shares)?;
+        aggregate_signature_shares(verification_key, &attributes, &signature_shares)?;
 
     Ok(Wallet {
         sig: aggregated_signature,

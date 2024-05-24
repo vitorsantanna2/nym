@@ -3,36 +3,83 @@
 
 use itertools::izip;
 
-use crate::aggregate_verification_keys;
-use crate::aggregate_wallets;
-use crate::error::CompactEcashError;
-use crate::generate_keypair_user;
-use crate::issue;
-use crate::issue_verify;
-use crate::scheme::keygen::KeyPairAuth;
-use crate::scheme::keygen::SecretKeyAuth;
+use crate::error::Result;
+use crate::scheme::coin_indices_signatures::{
+    aggregate_indices_signatures, sign_coin_indices, CoinIndexSignature, PartialCoinIndexSignature,
+};
+use crate::scheme::expiration_date_signatures::{
+    aggregate_expiration_signatures, sign_expiration_date, ExpirationDateSignature,
+    PartialExpirationDateSignature,
+};
+use crate::scheme::keygen::{KeyPairAuth, SecretKeyAuth};
 use crate::scheme::Payment;
-use crate::setup::setup;
-use crate::setup::GroupParameters;
-use crate::tests::e2e::generate_coin_indices_signatures;
-use crate::tests::e2e::generate_expiration_date_signatures;
-use crate::utils;
-use crate::withdrawal_request;
-use crate::PartialWallet;
-use crate::PayInfo;
-use crate::Scalar;
-use crate::VerificationKeyAuth;
+use crate::setup::Parameters;
+use crate::{
+    aggregate_verification_keys, aggregate_wallets, constants, generate_keypair_user, issue,
+    issue_verify, utils, withdrawal_request, PartialWallet, PayInfo, Scalar, VerificationKeyAuth,
+};
+
+pub fn generate_expiration_date_signatures(
+    expiration_date: u64,
+    secret_keys_authorities: &[SecretKeyAuth],
+    verification_keys_auth: &[VerificationKeyAuth],
+    verification_key: &VerificationKeyAuth,
+    indices: &[u64],
+) -> Result<Vec<ExpirationDateSignature>> {
+    let mut edt_partial_signatures: Vec<Vec<PartialExpirationDateSignature>> =
+        Vec::with_capacity(constants::CRED_VALIDITY_PERIOD as usize);
+    for sk_auth in secret_keys_authorities.iter() {
+        let sign = sign_expiration_date(sk_auth, expiration_date);
+        edt_partial_signatures.push(sign);
+    }
+    let combined_data: Vec<(
+        u64,
+        VerificationKeyAuth,
+        Vec<PartialExpirationDateSignature>,
+    )> = indices
+        .iter()
+        .zip(
+            verification_keys_auth
+                .iter()
+                .zip(edt_partial_signatures.iter()),
+        )
+        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
+        .collect();
+
+    aggregate_expiration_signatures(verification_key, expiration_date, &combined_data)
+}
+
+pub fn generate_coin_indices_signatures(
+    params: &Parameters,
+    secret_keys_authorities: &[SecretKeyAuth],
+    verification_keys_auth: &[VerificationKeyAuth],
+    verification_key: &VerificationKeyAuth,
+    indices: &[u64],
+) -> Result<Vec<CoinIndexSignature>> {
+    // create the partial signatures from each authority
+    let partial_signatures: Vec<Vec<PartialCoinIndexSignature>> = secret_keys_authorities
+        .iter()
+        .map(|sk_auth| sign_coin_indices(params, verification_key, sk_auth))
+        .collect();
+
+    let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> = indices
+        .iter()
+        .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
+        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
+        .collect();
+
+    aggregate_indices_signatures(params, verification_key, &combined_data)
+}
 
 pub fn payment_from_keys_and_expiration_date(
-    grp_params: &GroupParameters,
     ecash_keypairs: &Vec<KeyPairAuth>,
     indices: &[utils::SignerIndex],
     expiration_date: u64,
-) -> Result<(Payment, PayInfo), CompactEcashError> {
+) -> Result<(Payment, PayInfo)> {
     let total_coins = 32;
-    let params = setup(total_coins);
+    let params = Parameters::new(total_coins);
     let spend_date = Scalar::from(expiration_date - 29 * 86400);
-    let user_keypair = generate_keypair_user(grp_params);
+    let user_keypair = generate_keypair_user();
 
     let secret_keys_authorities: Vec<SecretKeyAuth> = ecash_keypairs
         .iter()
@@ -48,7 +95,6 @@ pub fn payment_from_keys_and_expiration_date(
 
     // generate valid dates signatures
     let dates_signatures = generate_expiration_date_signatures(
-        &params,
         expiration_date,
         &secret_keys_authorities,
         &verification_keys_auth,
@@ -67,15 +113,13 @@ pub fn payment_from_keys_and_expiration_date(
     //SAFETY : method intended for test only
     #[allow(clippy::unwrap_used)]
     // request a wallet
-    let (req, req_info) =
-        withdrawal_request(grp_params, &user_keypair.secret_key(), expiration_date).unwrap();
+    let (req, req_info) = withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
 
     // generate blinded signatures
     let mut wallet_blinded_signatures = Vec::new();
 
     for keypair in ecash_keypairs {
         let blinded_signature = issue(
-            grp_params,
             keypair.secret_key(),
             user_keypair.public_key(),
             &req,
@@ -93,21 +137,12 @@ pub fn payment_from_keys_and_expiration_date(
     )
     .enumerate()
     .map(|(idx, (w, vk))| {
-        issue_verify(
-            grp_params,
-            vk,
-            &user_keypair.secret_key(),
-            w,
-            &req_info,
-            idx as u64 + 1,
-        )
-        .unwrap()
+        issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
     })
     .collect();
 
     // Aggregate partial wallets
     let aggr_wallet = aggregate_wallets(
-        grp_params,
         &verification_key,
         &user_keypair.secret_key(),
         &unblinded_wallet_shares,

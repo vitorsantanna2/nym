@@ -96,4 +96,7 @@ pub enum CompactEcashError {
 
     #[error("failed to deserialize G1Projective point from the received bytes - it might not have been canonically encoded")]
     G1ProjectiveDeserializationFailure,
+
+    #[error("verification key is invalid for this opration")]
+    VerificationKeyTooShort,
 }

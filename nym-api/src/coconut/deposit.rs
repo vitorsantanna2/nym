@@ -46,9 +46,7 @@ pub async fn validate_deposit_tx(request: &BlindSignRequestBody, tx: TxResponse)
 mod test {
     use super::*;
     use crate::coconut::tests::{tx_entry_fixture, voucher_fixture};
-    use nym_compact_ecash::{
-        generate_keypair_user, scheme::withdrawal::WithdrawalRequest, setup::GroupParameters,
-    };
+    use nym_compact_ecash::{generate_keypair_user, scheme::withdrawal::WithdrawalRequest};
     use nym_credentials::coconut::bandwidth::CredentialType;
     use nym_ecash_contract_common::events::DEPOSITED_FUNDS_EVENT_TYPE;
     use nym_ecash_contract_common::events::{
@@ -279,7 +277,7 @@ mod test {
         )
         .unwrap();
         let expiration_date = 1708300800; // Feb, 19th, 2024
-        let ecash_keypair = generate_keypair_user(&GroupParameters::new());
+        let ecash_keypair = generate_keypair_user();
 
         let correct_request = BlindSignRequestBody::new(
             blind_sign_req,

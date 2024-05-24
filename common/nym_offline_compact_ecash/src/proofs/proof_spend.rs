@@ -7,10 +7,10 @@ use bls12_381::{G1Projective, G2Projective, Scalar};
 use group::{Curve, GroupEncoding};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use crate::ecash_group_parameters;
 use crate::error::{CompactEcashError, Result};
 use crate::proofs::{compute_challenge, produce_response, produce_responses, ChallengeDigest};
 use crate::scheme::keygen::VerificationKeyAuth;
-use crate::scheme::setup::Parameters;
 use crate::scheme::PayInfo;
 use crate::utils::{
     try_deserialize_g1_projective, try_deserialize_g2_projective, try_deserialize_scalar,
@@ -274,11 +274,8 @@ pub struct SpendProof {
     responses_attributes: Vec<Scalar>,
 }
 
-pub fn generate_witness_replacement(
-    params: &Parameters,
-    witness: &SpendWitness,
-) -> WitnessReplacement {
-    let grp_params = params.grp();
+pub fn generate_witness_replacement(witness: &SpendWitness) -> WitnessReplacement {
+    let grp_params = ecash_group_parameters();
     let r_attributes = grp_params.n_random_scalars(witness.attributes.len());
     let r_r = grp_params.random_scalar();
     let r_r_e = grp_params.random_scalar();
@@ -303,15 +300,17 @@ pub fn generate_witness_replacement(
 }
 
 pub fn compute_instance_commitments(
-    params: &Parameters,
     witness_replacement: &WitnessReplacement,
     instance: &SpendInstance,
     verification_key: &VerificationKeyAuth,
     rr: &[Scalar],
 ) -> InstanceCommitments {
-    let grp_params = params.grp();
+    let grp_params = ecash_group_parameters();
     let g1 = *grp_params.gen1();
+    //SAFETY: grp_params is static with length 3
+    #[allow(clippy::unwrap_used)]
     let gamma0 = grp_params.gamma_idx(0).unwrap();
+    #[allow(clippy::unwrap_used)]
     let gamma1 = grp_params.gamma_idx(1).unwrap();
 
     let tt_kappa = grp_params.gen2() * witness_replacement.r_r
@@ -379,7 +378,6 @@ pub fn compute_instance_commitments(
 
 impl SpendProof {
     pub fn construct(
-        params: &Parameters,
         instance: &SpendInstance,
         witness: &SpendWitness,
         verification_key: &VerificationKeyAuth,
@@ -387,18 +385,13 @@ impl SpendProof {
         pay_info: &PayInfo,
         spend_value: u64,
     ) -> Self {
-        let grp_params = params.grp();
+        let grp_params = ecash_group_parameters();
         // generate random values to replace each witness
-        let witness_replacement = generate_witness_replacement(params, witness);
+        let witness_replacement = generate_witness_replacement(witness);
 
         // compute zkp commitment for each instance
-        let instance_commitments = compute_instance_commitments(
-            params,
-            &witness_replacement,
-            instance,
-            verification_key,
-            rr,
-        );
+        let instance_commitments =
+            compute_instance_commitments(&witness_replacement, instance, verification_key, rr);
 
         let tt_aa_bytes = instance_commitments
             .tt_aa
@@ -479,15 +472,16 @@ impl SpendProof {
 
     pub fn verify(
         &self,
-        params: &Parameters,
         instance: &SpendInstance,
         verification_key: &VerificationKeyAuth,
         rr: &[Scalar],
         pay_info: &PayInfo,
         spend_value: u64,
     ) -> bool {
-        let grp_params = params.grp();
+        let grp_params = ecash_group_parameters();
         let g1 = *grp_params.gen1();
+        //SAFETY: grp_params is static with length 3
+        #[allow(clippy::unwrap_used)]
         let gamma0 = *grp_params.gamma_idx(0).unwrap();
 
         // re-compute each zkp commitment

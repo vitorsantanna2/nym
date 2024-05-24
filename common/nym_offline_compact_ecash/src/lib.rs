@@ -8,6 +8,7 @@
 
 use bls12_381::Scalar;
 use std::convert::TryInto;
+use std::sync::OnceLock;
 
 pub use bls12_381::G1Projective;
 pub use scheme::aggregation::aggregate_verification_keys;
@@ -39,6 +40,16 @@ mod traits;
 pub mod utils;
 
 pub type Attribute = Scalar;
+
+pub fn ecash_parameters() -> &'static setup::Parameters {
+    static ECACH_PARAMS: OnceLock<setup::Parameters> = OnceLock::new();
+    ECACH_PARAMS.get_or_init(|| setup::Parameters::new(constants::NB_TICKETS))
+}
+
+pub fn ecash_group_parameters() -> &'static setup::GroupParameters {
+    static ECACH_PARAMS: OnceLock<setup::GroupParameters> = OnceLock::new();
+    ECACH_PARAMS.get_or_init(|| setup::GroupParameters::new(constants::ATTRIBUTES_LEN))
+}
 
 impl Bytable for Attribute {
     fn to_byte_vec(&self) -> Vec<u8> {

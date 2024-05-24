@@ -13,9 +13,8 @@ use cw3::Status;
 use nym_api_requests::coconut::helpers::issued_credential_plaintext;
 use nym_api_requests::coconut::BlindSignRequestBody;
 use nym_compact_ecash::{
-    constants,
+    scheme::coin_indices_signatures::CoinIndexSignature,
     scheme::expiration_date_signatures::{sign_expiration_date, ExpirationDateSignature},
-    setup::{setup, CoinIndexSignature},
     utils::BlindedSignature,
     VerificationKeyAuth,
 };
@@ -34,8 +33,6 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use std::sync::Arc;
 use tokio::sync::{OnceCell, RwLock};
-
-pub use nym_credentials::coconut::bandwidth::bandwidth_credential_params;
 
 pub struct State {
     pub(crate) client: Arc<dyn LocalClient + Send + Sync>,
@@ -309,7 +306,6 @@ impl State {
         {
             Some(signatures) => Ok(signatures),
             None => {
-                let ecash_params = setup(constants::NB_TICKETS);
                 let verification_key = self.verification_key(current_epoch).await?;
                 let maybe_keypair_guard = self.coconut_keypair.get().await;
                 let Some(keypair_guard) = maybe_keypair_guard.as_ref() else {
@@ -322,7 +318,6 @@ impl State {
                     .coin_indices_sigs_cache
                     .refresh_signatures(
                         current_epoch,
-                        &ecash_params,
                         &verification_key,
                         &signing_key.keys.secret_key(),
                     )
