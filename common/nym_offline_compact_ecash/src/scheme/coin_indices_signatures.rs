@@ -336,7 +336,7 @@ mod tests {
         let verification_key =
             aggregate_verification_keys(&verification_keys_auth, Some(&indices)).unwrap();
 
-        let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_i_auth).unwrap();
+        let partial_signatures = sign_coin_indices(&params, &verification_key, sk_i_auth).unwrap();
         assert!(verify_coin_indices_signatures(
             &params,
             &verification_key,
@@ -366,7 +366,7 @@ mod tests {
         let verification_key =
             aggregate_verification_keys(&verification_keys_auth, Some(&indices)).unwrap();
 
-        let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_0_auth).unwrap();
+        let partial_signatures = sign_coin_indices(&params, &verification_key, sk_0_auth).unwrap();
         // Since we used a non matching verification key to verify the signature, the verification should fail
         assert!(verify_coin_indices_signatures(
             &params,
@@ -385,7 +385,7 @@ mod tests {
         let indices: [u64; 3] = [1, 2, 3];
 
         // list of secret keys of each authority
-        let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
+        let secret_keys_authorities: Vec<&SecretKeyAuth> = authorities_keypairs
             .iter()
             .map(|keypair| keypair.secret_key())
             .collect();

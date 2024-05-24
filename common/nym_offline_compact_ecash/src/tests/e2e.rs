@@ -29,7 +29,7 @@ mod tests {
         // generate authorities keys
         let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
-        let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
+        let secret_keys_authorities: Vec<&SecretKeyAuth> = authorities_keypairs
             .iter()
             .map(|keypair| keypair.secret_key())
             .collect();
@@ -61,7 +61,7 @@ mod tests {
 
         // request a wallet
         let (req, req_info) =
-            withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
+            withdrawal_request(user_keypair.secret_key(), expiration_date).unwrap();
         let req_bytes = req.to_bytes();
         let req2 = WithdrawalRequest::try_from(req_bytes.as_slice()).unwrap();
         assert_eq!(req, req2);
@@ -84,7 +84,7 @@ mod tests {
         )
         .enumerate()
         .map(|(idx, (w, vk))| {
-            issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
+            issue_verify(vk, user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
         })
         .collect();
 
@@ -96,7 +96,7 @@ mod tests {
         // Aggregate partial wallets
         let aggr_wallet = aggregate_wallets(
             &verification_key,
-            &user_keypair.secret_key(),
+            user_keypair.secret_key(),
             &unblinded_wallet_shares,
             &req_info,
         )?;
@@ -114,7 +114,7 @@ mod tests {
         let (payment, _) = aggr_wallet.spend(
             &params,
             &verification_key,
-            &user_keypair.secret_key(),
+            user_keypair.secret_key(),
             &pay_info,
             false,
             spend_vv,

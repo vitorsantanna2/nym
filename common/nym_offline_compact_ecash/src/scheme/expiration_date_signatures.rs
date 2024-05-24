@@ -379,7 +379,7 @@ mod tests {
         let authorities_keys = ttp_keygen(2, 3).unwrap();
         let sk_i_auth = authorities_keys[0].secret_key();
         let vk_i_auth = authorities_keys[0].verification_key();
-        let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date).unwrap();
+        let partial_exp_sig = sign_expiration_date(sk_i_auth, expiration_date).unwrap();
 
         assert!(
             verify_valid_dates_signatures(&vk_i_auth, &partial_exp_sig, expiration_date).is_ok()
@@ -393,7 +393,7 @@ mod tests {
         let authorities_keypairs = ttp_keygen(2, 3).unwrap();
         let indices: [u64; 3] = [1, 2, 3];
         // list of secret keys of each authority
-        let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
+        let secret_keys_authorities: Vec<&SecretKeyAuth> = authorities_keypairs
             .iter()
             .map(|keypair| keypair.secret_key())
             .collect();

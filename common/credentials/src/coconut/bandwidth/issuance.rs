@@ -147,7 +147,7 @@ impl IssuanceBandwidthCredential {
         // safety: the creation of the request can only fail if one provided invalid parameters
         // and we created then specific to this type of the credential so the unwrap is fine
         let (withdrawal_request, request_info) =
-            withdrawal_request(&self.ecash_keypair.secret_key(), self.expiration_date).unwrap();
+            withdrawal_request(self.ecash_keypair.secret_key(), self.expiration_date).unwrap();
 
         CredentialSigningData {
             withdrawal_request,
@@ -167,7 +167,7 @@ impl IssuanceBandwidthCredential {
     ) -> Result<PartialWallet, Error> {
         let unblinded_signature = issue_verify(
             validator_vk,
-            &self.ecash_keypair.secret_key(),
+            self.ecash_keypair.secret_key(),
             &blinded_signature,
             &signing_data.request_info,
             signer_index,
@@ -229,7 +229,7 @@ impl IssuanceBandwidthCredential {
     ) -> Result<Wallet, Error> {
         aggregate_wallets(
             verification_key,
-            &self.ecash_keypair.secret_key(),
+            self.ecash_keypair.secret_key(),
             shares,
             &signing_data.request_info,
         )
@@ -256,7 +256,7 @@ impl IssuanceBandwidthCredential {
             wallet,
             (&self.variant_data).into(),
             epoch_id,
-            self.ecash_keypair.secret_key(),
+            self.ecash_keypair.secret_key().clone(),
             exp_date_signatures,
             self.expiration_date,
         )

@@ -131,10 +131,8 @@ pub async fn post_free_pass(
 
     // produce the partial signature
     debug!("producing the partial credential");
-    let blinded_signature = blind_sign(
-        freepass_request_body.deref(),
-        &signing_key.keys.secret_key(),
-    )?;
+    let blinded_signature =
+        blind_sign(freepass_request_body.deref(), signing_key.keys.secret_key())?;
 
     // update the number of issued free passes
     state.storage.increment_issued_freepasses().await?;
@@ -209,7 +207,7 @@ pub async fn post_blind_sign(
     debug!("producing the partial credential");
     let blinded_signature = blind_sign(
         blind_sign_request_body.deref(),
-        &signing_key.keys.secret_key(),
+        signing_key.keys.secret_key(),
     )?;
 
     // store the information locally

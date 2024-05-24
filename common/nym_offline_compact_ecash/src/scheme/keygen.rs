@@ -502,8 +502,8 @@ impl KeyPairAuth {
         }
     }
 
-    pub fn secret_key(&self) -> SecretKeyAuth {
-        self.secret_key.clone()
+    pub fn secret_key(&self) -> &SecretKeyAuth {
+        &self.secret_key
     }
 
     pub fn verification_key(&self) -> VerificationKeyAuth {
@@ -519,8 +519,8 @@ pub struct KeyPairUser {
 }
 
 impl KeyPairUser {
-    pub fn secret_key(&self) -> SecretKeyUser {
-        self.secret_key.clone()
+    pub fn secret_key(&self) -> &SecretKeyUser {
+        &self.secret_key
     }
 
     pub fn public_key(&self) -> PublicKeyUser {

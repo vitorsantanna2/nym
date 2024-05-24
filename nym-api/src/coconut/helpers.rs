@@ -70,7 +70,7 @@ pub(crate) fn blind_sign<C: CredentialRequest>(
     signing_key: &SecretKeyAuth,
 ) -> Result<BlindedSignature, CoconutError> {
     Ok(nym_compact_ecash::scheme::withdrawal::issue(
-        signing_key.clone(),
+        signing_key,
         request.ecash_pubkey().clone(),
         request.withdrawal_request(),
         request.expiration_date(),

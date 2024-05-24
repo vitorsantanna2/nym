@@ -529,7 +529,7 @@ fn sign_expiration_date(
 /// Returns a `BlindedSignature` if the issuance process is successful, otherwise returns an error
 /// with a specific message indicating the failure.
 pub fn issue(
-    sk_auth: SecretKeyAuth,
+    sk_auth: &SecretKeyAuth,
     pk_user: PublicKeyUser,
     withdrawal_req: &WithdrawalRequest,
     expiration_date: u64,
@@ -552,7 +552,7 @@ pub fn issue(
     let expiration_date_sign = sign_expiration_date(
         &withdrawal_req.joined_commitment_hash,
         expiration_date,
-        &sk_auth,
+        sk_auth,
     );
     // Combine both signatures
     let signature =

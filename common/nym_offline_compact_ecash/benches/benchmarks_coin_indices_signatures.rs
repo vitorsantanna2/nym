@@ -31,7 +31,7 @@ fn bench_coin_signing(c: &mut Criterion) {
     let verification_key =
         aggregate_verification_keys(&verification_keys_auth, Some(&indices)).unwrap();
 
-    let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_i_auth).unwrap();
+    let partial_signatures = sign_coin_indices(&params, &verification_key, sk_i_auth).unwrap();
 
     // ISSUING AUTHORITY BENCHMARK: issue a set of (partial) signatures for coin indices
     group.bench_function(
@@ -39,7 +39,7 @@ fn bench_coin_signing(c: &mut Criterion) {
             "[IssuingAuthority] sign_coin_indices_L_{}",
             params.get_total_coins()
         ),
-        |b| b.iter(|| sign_coin_indices(&params, &verification_key, &sk_i_auth)),
+        |b| b.iter(|| sign_coin_indices(&params, &verification_key, sk_i_auth)),
     );
 
     // CLIENT: verify the correctness of the (partial)) signatures for coin indices
@@ -77,7 +77,7 @@ fn bench_aggregate_coin_indices_signatures(c: &mut Criterion) {
     let indices: [u64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
     // list of secret keys of each authority
-    let secret_keys_authorities: Vec<SecretKeyAuth> = authorities_keypairs
+    let secret_keys_authorities: Vec<&SecretKeyAuth> = authorities_keypairs
         .iter()
         .map(|keypair| keypair.secret_key())
         .collect();

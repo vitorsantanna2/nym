@@ -21,7 +21,7 @@ use crate::{
 
 pub fn generate_expiration_date_signatures(
     expiration_date: u64,
-    secret_keys_authorities: &[SecretKeyAuth],
+    secret_keys_authorities: &[&SecretKeyAuth],
     verification_keys_auth: &[VerificationKeyAuth],
     verification_key: &VerificationKeyAuth,
     indices: &[u64],
@@ -53,7 +53,7 @@ pub fn generate_expiration_date_signatures(
 
 pub fn generate_coin_indices_signatures(
     params: &Parameters,
-    secret_keys_authorities: &[SecretKeyAuth],
+    secret_keys_authorities: &[&SecretKeyAuth],
     verification_keys_auth: &[VerificationKeyAuth],
     verification_key: &VerificationKeyAuth,
     indices: &[u64],
@@ -85,7 +85,7 @@ pub fn payment_from_keys_and_expiration_date(
     let spend_date = Scalar::from(expiration_date - 29 * 86400);
     let user_keypair = generate_keypair_user();
 
-    let secret_keys_authorities: Vec<SecretKeyAuth> = ecash_keypairs
+    let secret_keys_authorities: Vec<&SecretKeyAuth> = ecash_keypairs
         .iter()
         .map(|keypair| keypair.secret_key())
         .collect();
@@ -117,7 +117,7 @@ pub fn payment_from_keys_and_expiration_date(
     //SAFETY : method intended for test only
     #[allow(clippy::unwrap_used)]
     // request a wallet
-    let (req, req_info) = withdrawal_request(&user_keypair.secret_key(), expiration_date).unwrap();
+    let (req, req_info) = withdrawal_request(user_keypair.secret_key(), expiration_date).unwrap();
 
     // generate blinded signatures
     let mut wallet_blinded_signatures = Vec::new();
@@ -141,14 +141,14 @@ pub fn payment_from_keys_and_expiration_date(
     )
     .enumerate()
     .map(|(idx, (w, vk))| {
-        issue_verify(vk, &user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
+        issue_verify(vk, user_keypair.secret_key(), w, &req_info, idx as u64 + 1).unwrap()
     })
     .collect();
 
     // Aggregate partial wallets
     let aggr_wallet = aggregate_wallets(
         &verification_key,
-        &user_keypair.secret_key(),
+        user_keypair.secret_key(),
         &unblinded_wallet_shares,
         &req_info,
     )?;
@@ -162,7 +162,7 @@ pub fn payment_from_keys_and_expiration_date(
     let (payment, _) = aggr_wallet.spend(
         &params,
         &verification_key,
-        &user_keypair.secret_key(),
+        user_keypair.secret_key(),
         &pay_info,
         false,
         spend_vv,
