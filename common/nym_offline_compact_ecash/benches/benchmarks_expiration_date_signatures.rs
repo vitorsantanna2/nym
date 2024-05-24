@@ -3,7 +3,7 @@
 
 use nym_compact_ecash::scheme::expiration_date_signatures::{
     aggregate_expiration_signatures, sign_expiration_date, verify_valid_dates_signatures,
-    PartialExpirationDateSignature,
+    ExpirationDateSignatureShare, PartialExpirationDateSignature,
 };
 
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -67,14 +67,14 @@ fn bench_aggregate_expiration_date_signatures(c: &mut Criterion) {
         partial_signatures.push(sign);
     }
 
-    let combined_data: Vec<(
-        u64,
-        VerificationKeyAuth,
-        Vec<PartialExpirationDateSignature>,
-    )> = indices
+    let combined_data: Vec<_> = indices
         .iter()
         .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
+        .map(|(i, (vk, sigs))| ExpirationDateSignatureShare {
+            index: *i,
+            key: vk.clone(),
+            signatures: sigs.to_vec(),
+        })
         .collect();
 
     // CLIENT: verify all the partial signature vectors and aggregate into a single vector of signed valid dates

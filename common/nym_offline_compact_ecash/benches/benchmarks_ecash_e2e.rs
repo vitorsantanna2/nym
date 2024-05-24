@@ -274,18 +274,9 @@ fn bench_compact_ecash(c: &mut Criterion) {
             case.spend_vv,
             public_keys.len()
         ),
-        |b| {
-            b.iter(|| {
-                identify(
-                    payment.clone(),
-                    payment2.clone(),
-                    pay_info.clone(),
-                    pay_info2.clone(),
-                )
-            })
-        },
+        |b| b.iter(|| identify(payment.clone(), payment2.clone(), pay_info, pay_info2)),
     );
-    let identify_result = identify(payment, payment2, pay_info.clone(), pay_info2.clone());
+    let identify_result = identify(payment, payment2, pay_info, pay_info2);
     assert_eq!(
         identify_result,
         IdentifyResult::DoubleSpendingPublicKeys(user_keypair.public_key())

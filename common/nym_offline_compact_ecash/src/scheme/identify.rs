@@ -171,12 +171,8 @@ mod tests {
             .spend_verify(&verification_key, &pay_info1, spend_date)
             .unwrap());
 
-        let pay_info2 = pay_info1.clone();
-        let identify_result = identify(payment1, payment2, pay_info1.clone(), pay_info2.clone());
-        assert_eq!(
-            identify_result,
-            IdentifyResult::DuplicatePayInfo(pay_info1.clone())
-        );
+        let identify_result = identify(payment1, payment2, pay_info1, pay_info1);
+        assert_eq!(identify_result, IdentifyResult::DuplicatePayInfo(pay_info1));
     }
 
     #[test]
@@ -299,7 +295,7 @@ mod tests {
             .spend_verify(&verification_key, &pay_info2, spend_date)
             .unwrap());
 
-        let identify_result = identify(payment1, payment2, pay_info1.clone(), pay_info2.clone());
+        let identify_result = identify(payment1, payment2, pay_info1, pay_info2);
         assert_eq!(identify_result, IdentifyResult::NotADuplicatePayment);
     }
 
@@ -438,7 +434,7 @@ mod tests {
             .spend_verify(&verification_key, &pay_info2, spend_date)
             .unwrap());
 
-        let identify_result = identify(payment1, payment2, pay_info1.clone(), pay_info2.clone());
+        let identify_result = identify(payment1, payment2, pay_info1, pay_info2);
         assert_eq!(
             identify_result,
             IdentifyResult::DoubleSpendingPublicKeys(user_keypair.public_key())
@@ -576,7 +572,7 @@ mod tests {
             )
             .unwrap();
 
-        let identify_result = identify(payment1, payment2, pay_info1.clone(), pay_info2.clone());
+        let identify_result = identify(payment1, payment2, pay_info1, pay_info2);
         assert_eq!(
             identify_result,
             IdentifyResult::DoubleSpendingPublicKeys(user_keypair.public_key())

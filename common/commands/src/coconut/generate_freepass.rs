@@ -15,6 +15,7 @@ use nym_credentials::{
     obtain_aggregate_verification_key, IssuanceBandwidthCredential, IssuedBandwidthCredential,
 };
 use nym_credentials_interface::aggregate_expiration_signatures;
+use nym_credentials_interface::ExpirationDateSignatureShare;
 use nym_credentials_interface::VerificationKeyAuth;
 use nym_validator_client::coconut::all_ecash_api_clients;
 use nym_validator_client::nyxd::contract_traits::{DkgQueryClient, NymContractsProvider};
@@ -102,12 +103,12 @@ async fn get_freepass(
             {
                 Ok(signature) => {
                     let index = client.node_id;
-                    let share = client.verification_key.clone();
-                    shares
-                        .lock()
-                        .await
-                        .1
-                        .push((index, share, signature.signatures));
+                    let key_share = client.verification_key.clone();
+                    shares.lock().await.1.push(ExpirationDateSignatureShare {
+                        index,
+                        key: key_share,
+                        signatures: signature.signatures,
+                    });
                 }
                 Err(err) => {
                     error!("failed to obtain expiration date signature from {api_url}: {err}");

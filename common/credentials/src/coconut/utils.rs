@@ -6,8 +6,8 @@ use crate::error::Error;
 use log::{debug, warn};
 use nym_credentials_interface::{
     aggregate_expiration_signatures, aggregate_indices_signatures, aggregate_verification_keys,
-    constants, Base58, CoinIndexSignature, ExpirationDateSignature, PartialCoinIndexSignature,
-    PartialExpirationDateSignature, VerificationKeyAuth, Wallet,
+    constants, Base58, CoinIndexSignature, CoinIndexSignatureShare, ExpirationDateSignature,
+    ExpirationDateSignatureShare, VerificationKeyAuth, Wallet,
 };
 use nym_validator_client::client::CoconutApiClient;
 use time::{macros::time, Duration, OffsetDateTime};
@@ -59,11 +59,8 @@ pub async fn obtain_expiration_date_signatures(
         return Err(Error::NoValidatorsAvailable);
     }
 
-    let mut signatures: Vec<(
-        u64,
-        VerificationKeyAuth,
-        Vec<PartialExpirationDateSignature>,
-    )> = Vec::with_capacity(ecash_api_clients.len());
+    let mut signatures_shares: Vec<ExpirationDateSignatureShare> =
+        Vec::with_capacity(ecash_api_clients.len());
 
     let expiration_date = cred_exp_date_timestamp();
     for ecash_api_client in ecash_api_clients.iter() {
@@ -74,8 +71,12 @@ pub async fn obtain_expiration_date_signatures(
         {
             Ok(signature) => {
                 let index = ecash_api_client.node_id;
-                let share = ecash_api_client.verification_key.clone();
-                signatures.push((index, share, signature.signatures));
+                let key_share = ecash_api_client.verification_key.clone();
+                signatures_shares.push(ExpirationDateSignatureShare {
+                    index,
+                    key: key_share,
+                    signatures: signature.signatures,
+                });
             }
             Err(err) => {
                 warn!(
@@ -86,12 +87,12 @@ pub async fn obtain_expiration_date_signatures(
         }
     }
 
-    if signatures.len() < threshold as usize {
+    if signatures_shares.len() < threshold as usize {
         return Err(Error::NotEnoughShares);
     }
 
     //this already takes care of partial signatures validation
-    aggregate_expiration_signatures(verification_key, expiration_date, &signatures)
+    aggregate_expiration_signatures(verification_key, expiration_date, &signatures_shares)
         .map_err(Error::CompactEcashError)
 }
 
@@ -104,15 +105,19 @@ pub async fn obtain_coin_indices_signatures(
         return Err(Error::NoValidatorsAvailable);
     }
 
-    let mut signatures: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> =
+    let mut signatures_shares: Vec<CoinIndexSignatureShare> =
         Vec::with_capacity(ecash_api_clients.len());
 
     for ecash_api_client in ecash_api_clients.iter() {
         match ecash_api_client.api_client.coin_indices_signatures().await {
             Ok(signature) => {
                 let index = ecash_api_client.node_id;
-                let share = ecash_api_client.verification_key.clone();
-                signatures.push((index, share, signature.signatures));
+                let key_share = ecash_api_client.verification_key.clone();
+                signatures_shares.push(CoinIndexSignatureShare {
+                    index,
+                    key: key_share,
+                    signatures: signature.signatures,
+                });
             }
             Err(err) => {
                 warn!(
@@ -123,7 +128,7 @@ pub async fn obtain_coin_indices_signatures(
         }
     }
 
-    if signatures.len() < threshold as usize {
+    if signatures_shares.len() < threshold as usize {
         return Err(Error::NotEnoughShares);
     }
 
@@ -131,7 +136,7 @@ pub async fn obtain_coin_indices_signatures(
     aggregate_indices_signatures(
         nym_credentials_interface::ecash_parameters(),
         verification_key,
-        &signatures,
+        &signatures_shares,
     )
     .map_err(Error::CompactEcashError)
 }

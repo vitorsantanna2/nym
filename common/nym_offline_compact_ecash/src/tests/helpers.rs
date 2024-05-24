@@ -5,11 +5,12 @@ use itertools::izip;
 
 use crate::error::Result;
 use crate::scheme::coin_indices_signatures::{
-    aggregate_indices_signatures, sign_coin_indices, CoinIndexSignature, PartialCoinIndexSignature,
+    aggregate_indices_signatures, sign_coin_indices, CoinIndexSignature, CoinIndexSignatureShare,
+    PartialCoinIndexSignature,
 };
 use crate::scheme::expiration_date_signatures::{
     aggregate_expiration_signatures, sign_expiration_date, ExpirationDateSignature,
-    PartialExpirationDateSignature,
+    ExpirationDateSignatureShare, PartialExpirationDateSignature,
 };
 use crate::scheme::keygen::{KeyPairAuth, SecretKeyAuth};
 use crate::scheme::Payment;
@@ -34,18 +35,18 @@ pub fn generate_expiration_date_signatures(
         let sign = sign_expiration_date(sk_auth, expiration_date).unwrap();
         edt_partial_signatures.push(sign);
     }
-    let combined_data: Vec<(
-        u64,
-        VerificationKeyAuth,
-        Vec<PartialExpirationDateSignature>,
-    )> = indices
+    let combined_data: Vec<_> = indices
         .iter()
         .zip(
             verification_keys_auth
                 .iter()
                 .zip(edt_partial_signatures.iter()),
         )
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
+        .map(|(i, (vk, sigs))| ExpirationDateSignatureShare {
+            index: *i,
+            key: vk.clone(),
+            signatures: sigs.to_vec(),
+        })
         .collect();
 
     aggregate_expiration_signatures(verification_key, expiration_date, &combined_data)
@@ -66,10 +67,14 @@ pub fn generate_coin_indices_signatures(
         .map(|sk_auth| sign_coin_indices(params, verification_key, sk_auth).unwrap())
         .collect();
 
-    let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> = indices
+    let combined_data: Vec<_> = indices
         .iter()
         .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
+        .map(|(i, (vk, sigs))| CoinIndexSignatureShare {
+            index: *i,
+            key: vk.clone(),
+            signatures: sigs.to_vec(),
+        })
         .collect();
 
     aggregate_indices_signatures(params, verification_key, &combined_data)

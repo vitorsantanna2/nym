@@ -10,17 +10,24 @@ use time::OffsetDateTime;
 
 pub use nym_compact_ecash::{
     aggregate_verification_keys, aggregate_wallets, constants, ecash_parameters,
-    error::CompactEcashError, generate_keypair_user, generate_keypair_user_from_seed, issue_verify,
+    error::CompactEcashError,
+    generate_keypair_user, generate_keypair_user_from_seed, issue_verify,
     scheme::coin_indices_signatures::aggregate_indices_signatures,
-    scheme::coin_indices_signatures::CoinIndexSignature,
-    scheme::coin_indices_signatures::PartialCoinIndexSignature,
+    scheme::coin_indices_signatures::{
+        CoinIndexSignature, CoinIndexSignatureShare, PartialCoinIndexSignature,
+    },
     scheme::expiration_date_signatures::aggregate_expiration_signatures,
     scheme::expiration_date_signatures::date_scalar,
-    scheme::expiration_date_signatures::ExpirationDateSignature,
-    scheme::expiration_date_signatures::PartialExpirationDateSignature,
-    scheme::keygen::KeyPairUser, scheme::withdrawal::RequestInfo, scheme::Payment, scheme::Wallet,
-    utils::BlindedSignature, withdrawal_request, Base58, Bytable, PartialWallet, PayInfo,
-    PublicKeyUser, SecretKeyUser, VerificationKeyAuth, WithdrawalRequest,
+    scheme::expiration_date_signatures::{
+        ExpirationDateSignature, ExpirationDateSignatureShare, PartialExpirationDateSignature,
+    },
+    scheme::keygen::KeyPairUser,
+    scheme::withdrawal::RequestInfo,
+    scheme::Payment,
+    scheme::Wallet,
+    utils::BlindedSignature,
+    withdrawal_request, Base58, Bytable, PartialWallet, PayInfo, PublicKeyUser, SecretKeyUser,
+    VerificationKeyAuth, WithdrawalRequest,
 };
 
 pub const VOUCHER_INFO_TYPE: &str = "BandwidthVoucher";

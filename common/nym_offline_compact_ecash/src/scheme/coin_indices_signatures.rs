@@ -8,7 +8,9 @@ use crate::error::{CompactEcashError, Result};
 use crate::scheme::keygen::{SecretKeyAuth, VerificationKeyAuth};
 use crate::scheme::setup::Parameters;
 use crate::traits::Bytable;
-use crate::utils::{check_bilinear_pairing, generate_lagrangian_coefficients_at_origin};
+use crate::utils::{
+    check_bilinear_pairing, generate_lagrangian_coefficients_at_origin, SignerIndex,
+};
 use crate::utils::{hash_g1, try_deserialize_g1_projective};
 use crate::{constants, ecash_group_parameters, Base58};
 use itertools::Itertools;
@@ -21,6 +23,11 @@ pub struct CoinIndexSignature {
 }
 
 pub type PartialCoinIndexSignature = CoinIndexSignature;
+pub struct CoinIndexSignatureShare {
+    pub index: SignerIndex,
+    pub key: VerificationKeyAuth,
+    pub signatures: Vec<PartialCoinIndexSignature>,
+}
 
 impl CoinIndexSignature {
     pub fn randomise(&self) -> (CoinIndexSignature, Scalar) {
@@ -239,33 +246,31 @@ pub fn verify_coin_indices_signatures(
 pub fn aggregate_indices_signatures(
     params: &Parameters,
     vk: &VerificationKeyAuth,
-    signatures: &[(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)],
+    signatures_shares: &[CoinIndexSignatureShare],
 ) -> Result<Vec<CoinIndexSignature>> {
     // Check if all indices are unique
-    if signatures
+    if signatures_shares
         .iter()
-        .map(|(index, _, _)| index)
+        .map(|share| share.index)
         .unique()
         .count()
-        != signatures.len()
+        != signatures_shares.len()
     {
         return Err(CompactEcashError::AggregationDuplicateIndices);
     }
 
     // Evaluate at 0 the Lagrange basis polynomials k_i
     let coefficients = generate_lagrangian_coefficients_at_origin(
-        &signatures
+        &signatures_shares
             .iter()
-            .map(|(index, _, _)| *index)
+            .map(|share| share.index)
             .collect::<Vec<_>>(),
     );
 
     // Verify that all signatures are valid
-    signatures
-        .par_iter()
-        .try_for_each(|(_, vk_auth, partial_signatures)| {
-            verify_coin_indices_signatures(params, vk, vk_auth, partial_signatures)
-        })?;
+    signatures_shares.par_iter().try_for_each(|share| {
+        verify_coin_indices_signatures(params, vk, &share.key, &share.signatures)
+    })?;
 
     // Pre-allocate vectors
     let mut aggregated_coin_signatures: Vec<CoinIndexSignature> =
@@ -280,9 +285,9 @@ pub fn aggregate_indices_signatures(
         let h = hash_g1(concatenated_bytes);
 
         // Collect the partial signatures for the same coin index
-        let collected_at_l: Vec<_> = signatures
+        let collected_at_l: Vec<_> = signatures_shares
             .iter()
-            .filter_map(|(_, _, inner_vec)| inner_vec.get(l as usize))
+            .filter_map(|share| share.signatures.get(l as usize))
             .collect();
 
         // Aggregate partial signatures for each coin index
@@ -404,12 +409,15 @@ mod tests {
             .map(|sk_auth| sign_coin_indices(&params, &verification_key, sk_auth).unwrap())
             .collect();
 
-        let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> =
-            indices
-                .iter()
-                .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
-                .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
-                .collect();
+        let combined_data = indices
+            .iter()
+            .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
+            .map(|(i, (vk, sigs))| CoinIndexSignatureShare {
+                index: *i,
+                key: vk.clone(),
+                signatures: sigs.clone(),
+            })
+            .collect::<Vec<_>>();
 
         assert!(aggregate_indices_signatures(&params, &verification_key, &combined_data).is_ok());
     }

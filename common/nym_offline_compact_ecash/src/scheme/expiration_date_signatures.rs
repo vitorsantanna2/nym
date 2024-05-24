@@ -4,11 +4,11 @@
 use crate::error::{CompactEcashError, Result};
 use crate::scheme::keygen::{SecretKeyAuth, VerificationKeyAuth};
 use crate::traits::Bytable;
-use crate::utils::hash_g1;
 use crate::utils::{
     check_bilinear_pairing, generate_lagrangian_coefficients_at_origin,
     try_deserialize_g1_projective,
 };
+use crate::utils::{hash_g1, SignerIndex};
 use crate::{constants, ecash_group_parameters, Base58};
 use bls12_381::{G1Projective, G2Prepared, G2Projective, Scalar};
 use group::Curve;
@@ -23,6 +23,11 @@ pub struct ExpirationDateSignature {
 }
 
 pub type PartialExpirationDateSignature = ExpirationDateSignature;
+pub struct ExpirationDateSignatureShare {
+    pub index: SignerIndex,
+    pub key: VerificationKeyAuth,
+    pub signatures: Vec<PartialExpirationDateSignature>,
+}
 
 impl ExpirationDateSignature {
     /// Function randomises the expiration date signature.
@@ -214,7 +219,7 @@ pub fn verify_valid_dates_signatures(
 ///
 /// * `vk_auth` - The global verification key.
 /// * `expiration_date` - The expiration date for which the signatures are being aggregated (as unix timestamp).
-/// * `signatures` - A list of tuples containing unique indices, verification keys, and partial expiration date signatures corresponding to the signing authorities.
+/// * `signatures_shares` - A list of tuples containing unique indices, verification keys, and partial expiration date signatures corresponding to the signing authorities.
 ///
 /// # Returns
 ///
@@ -236,37 +241,31 @@ pub fn verify_valid_dates_signatures(
 pub fn aggregate_expiration_signatures(
     vk: &VerificationKeyAuth,
     expiration_date: u64,
-    signatures: &[(
-        u64,
-        VerificationKeyAuth,
-        Vec<PartialExpirationDateSignature>,
-    )],
+    signatures_shares: &[ExpirationDateSignatureShare],
 ) -> Result<Vec<ExpirationDateSignature>> {
     // Check if all indices are unique
-    if signatures
+    if signatures_shares
         .iter()
-        .map(|(index, _, _)| index)
+        .map(|share: &ExpirationDateSignatureShare| share.index)
         .unique()
         .count()
-        != signatures.len()
+        != signatures_shares.len()
     {
         return Err(CompactEcashError::AggregationDuplicateIndices);
     }
 
     // Evaluate at 0 the Lagrange basis polynomials k_i
     let coefficients = generate_lagrangian_coefficients_at_origin(
-        &signatures
+        &signatures_shares
             .iter()
-            .map(|(index, _, _)| *index)
+            .map(|share| share.index)
             .collect::<Vec<_>>(),
     );
 
     // Verify that all signatures are valid
-    signatures
-        .par_iter()
-        .try_for_each(|(_, vk_auth, partial_signatures)| {
-            verify_valid_dates_signatures(vk_auth, partial_signatures, expiration_date)
-        })?;
+    signatures_shares.par_iter().try_for_each(|share| {
+        verify_valid_dates_signatures(&share.key, &share.signatures, expiration_date)
+    })?;
 
     // Pre-allocate vectors
     let mut aggregated_date_signatures: Vec<ExpirationDateSignature> =
@@ -282,9 +281,9 @@ pub fn aggregate_expiration_signatures(
         let h = hash_g1([m0.to_bytes(), m1.to_bytes()].concat());
 
         // Collect the partial signatures for the same valid date
-        let collected_at_l: Vec<_> = signatures
+        let collected_at_l: Vec<_> = signatures_shares
             .iter()
-            .filter_map(|(_, _, inner_vec)| inner_vec.get(l as usize))
+            .filter_map(|share| share.signatures.get(l as usize))
             .cloned()
             .collect();
 
@@ -413,19 +412,19 @@ mod tests {
             edt_partial_signatures.push(sign);
         }
 
-        let combined_data: Vec<(
-            u64,
-            VerificationKeyAuth,
-            Vec<PartialExpirationDateSignature>,
-        )> = indices
+        let combined_data = indices
             .iter()
             .zip(
                 verification_keys_auth
                     .iter()
                     .zip(edt_partial_signatures.iter()),
             )
-            .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
-            .collect();
+            .map(|(i, (vk, sigs))| ExpirationDateSignatureShare {
+                index: *i,
+                key: vk.clone(),
+                signatures: sigs.to_vec(),
+            })
+            .collect::<Vec<_>>();
 
         assert!(aggregate_expiration_signatures(
             &verification_key,

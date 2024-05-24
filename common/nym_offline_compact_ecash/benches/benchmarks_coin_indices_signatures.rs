@@ -4,7 +4,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use nym_compact_ecash::scheme::coin_indices_signatures::{
     aggregate_indices_signatures, sign_coin_indices, verify_coin_indices_signatures,
-    PartialCoinIndexSignature,
+    CoinIndexSignatureShare, PartialCoinIndexSignature,
 };
 use nym_compact_ecash::scheme::keygen::SecretKeyAuth;
 use nym_compact_ecash::setup::Parameters;
@@ -96,10 +96,14 @@ fn bench_aggregate_coin_indices_signatures(c: &mut Criterion) {
         .map(|sk_auth| sign_coin_indices(&params, &verification_key, sk_auth).unwrap())
         .collect();
 
-    let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> = indices
+    let combined_data: Vec<_> = indices
         .iter()
         .zip(verification_keys_auth.iter().zip(partial_signatures.iter()))
-        .map(|(i, (vk, sigs))| (*i, vk.clone(), sigs.clone()))
+        .map(|(i, (vk, sigs))| CoinIndexSignatureShare {
+            index: *i,
+            key: vk.clone(),
+            signatures: sigs.to_vec(),
+        })
         .collect();
 
     // CLIENT: verify all the partial signature vectors and aggregate into a single vector of signed coin indices
