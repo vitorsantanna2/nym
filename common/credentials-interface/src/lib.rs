@@ -155,9 +155,9 @@ impl CredentialSpendingData {
 
     pub fn try_from_bytes(raw: &[u8]) -> Result<Self, CompactEcashError> {
         if raw.len() < 72 + 8 + 8 + 8 + 4 + 4 {
-            return Err(CompactEcashError::Deserialization(
-                "Invalid byte array for EcashCredential deserialization".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "EcashCredential".into(),
+            });
         }
         let mut index = 0;
         //SAFETY : casting a slice of lenght 4 into an array of size 4
@@ -165,17 +165,17 @@ impl CredentialSpendingData {
         index += 4;
 
         if raw[index..].len() < payment_len {
-            return Err(CompactEcashError::Deserialization(
-                "Invalid byte array for EcashCredential deserialization".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "EcashCredential".into(),
+            });
         }
         let payment = Payment::try_from(&raw[index..index + payment_len])?;
         index += payment_len;
 
         if raw[index..].len() < 72 + 8 + 8 + 8 + 4 {
-            return Err(CompactEcashError::Deserialization(
-                "Invalid byte array for EcashCredential deserialization".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "EcashCredential".into(),
+            });
         }
 
         let pay_info = PayInfo {
@@ -197,17 +197,21 @@ impl CredentialSpendingData {
         index += 4;
 
         if raw[index..].len() != typ_len + 8 {
-            return Err(CompactEcashError::Deserialization(
-                "Invalid byte array for EcashCredential deserialization".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "EcashCredential".into(),
+            });
         }
 
         let raw_typ = String::from_utf8(raw[index..index + typ_len].to_vec()).map_err(|_| {
-            CompactEcashError::Deserialization("Failed to deserialize type".to_string())
+            CompactEcashError::DeserializationFailure {
+                object: "Credential type".into(),
+            }
         })?;
-        let typ = raw_typ.parse().map_err(|_| {
-            CompactEcashError::Deserialization("Failed to deserialize type".to_string())
-        })?;
+        let typ = raw_typ
+            .parse()
+            .map_err(|_| CompactEcashError::DeserializationFailure {
+                object: "Credential type".into(),
+            })?;
         index += typ_len;
 
         //SAFETY : casting a slice of lenght 8 into an array of size 8

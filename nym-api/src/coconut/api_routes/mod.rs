@@ -17,7 +17,6 @@ use nym_api_requests::coconut::{
     PartialExpirationDateSignatureResponse, VerifyEcashCredentialBody,
 };
 use nym_coconut_dkg_common::types::EpochId;
-use nym_compact_ecash::error::CompactEcashError;
 use nym_compact_ecash::identify::IdentifyResult;
 use nym_credentials::coconut::utils::{
     cred_exp_date_timestamp, freepass_exp_date_timestamp, today_timestamp,
@@ -199,9 +198,7 @@ pub async fn post_blind_sign(
 
     //check expiration date validity
     if blind_sign_request_body.expiration_date > cred_exp_date_timestamp() {
-        return Err(
-            CompactEcashError::ExpirationDate("Invalid expiration date".to_string()).into(),
-        );
+        return Err(CoconutError::ExpirationDateTooLate);
     }
 
     // check validity of the request

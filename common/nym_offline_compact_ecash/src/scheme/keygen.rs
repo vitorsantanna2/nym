@@ -70,25 +70,15 @@ impl TryFrom<&[u8]> for SecretKeyAuth {
         let actual_ys_len = (bytes.len() - 40) / 32;
 
         if ys_len as usize != actual_ys_len {
-            return Err(CompactEcashError::Deserialization(format!(
-                "Tried to deserialize secret key with inconsistent ys len (expected {}, got {})",
-                ys_len, actual_ys_len
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "Secret_key ys".into(),
+                expected: ys_len as usize,
+                actual: actual_ys_len,
+            });
         }
 
-        let x = try_deserialize_scalar(
-            &x_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize secret key scalar".to_string(),
-            ),
-        )?;
-        let ys = try_deserialize_scalar_vec(
-            ys_len,
-            &bytes[40..],
-            CompactEcashError::Deserialization(
-                "Failed to deserialize secret key scalars".to_string(),
-            ),
-        )?;
+        let x = try_deserialize_scalar(&x_bytes)?;
+        let ys = try_deserialize_scalar_vec(ys_len, &bytes[40..])?;
 
         Ok(SecretKeyAuth { x, ys })
     }
@@ -189,19 +179,14 @@ impl TryFrom<&[u8]> for VerificationKeyAuth {
         let actual_betas_len = (bytes.len() - 104) / (96 + 48);
 
         if betas_len as usize != actual_betas_len {
-            return Err(
-                CompactEcashError::Deserialization(
-                    format!("Tried to deserialize verification key with inconsistent betas len (expected {}, got {})",
-                            betas_len, actual_betas_len
-                    )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "Verification_key betas".into(),
+                expected: betas_len as usize,
+                actual: actual_betas_len,
+            });
         }
 
-        let alpha = try_deserialize_g2_projective(
-            &alpha_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize verification key G2 point (alpha)".to_string(),
-            ),
-        )?;
+        let alpha = try_deserialize_g2_projective(&alpha_bytes)?;
 
         let mut beta_g1 = Vec::with_capacity(betas_len as usize);
         let mut beta_g1_end: u64 = 0;
@@ -211,12 +196,7 @@ impl TryFrom<&[u8]> for VerificationKeyAuth {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let beta_i_bytes = bytes[start..end].try_into().unwrap();
-            let beta_i = try_deserialize_g1_projective(
-                &beta_i_bytes,
-                CompactEcashError::Deserialization(
-                    "Failed to deserialize verification key G1 point (beta)".to_string(),
-                ),
-            )?;
+            let beta_i = try_deserialize_g1_projective(&beta_i_bytes)?;
 
             beta_g1_end = end as u64;
             beta_g1.push(beta_i)
@@ -229,12 +209,7 @@ impl TryFrom<&[u8]> for VerificationKeyAuth {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let beta_i_bytes = bytes[start..end].try_into().unwrap();
-            let beta_i = try_deserialize_g2_projective(
-                &beta_i_bytes,
-                CompactEcashError::Deserialization(
-                    "Failed to deserialize verification key G2 point (beta)".to_string(),
-                ),
-            )?;
+            let beta_i = try_deserialize_g2_projective(&beta_i_bytes)?;
 
             beta_g2.push(beta_i)
         }
@@ -445,9 +420,7 @@ impl PublicKeyUser {
     }
 
     pub fn from_base58_string<I: AsRef<[u8]>>(val: I) -> Result<Self> {
-        let bytes = bs58::decode(val)
-            .into_vec()
-            .map_err(|source| CompactEcashError::Deserialization(source.to_string()))?;
+        let bytes = bs58::decode(val).into_vec()?;
         Self::from_bytes(&bytes)
     }
 
@@ -457,19 +430,16 @@ impl PublicKeyUser {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 48 {
-            return Err(CompactEcashError::Deserialization(
-                "Failed to deserialize : Invalid length".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "PublicKeyUser".into(),
+                expected: 48,
+                actual: bytes.len(),
+            });
         }
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let pk_bytes: &[u8; 48] = bytes[..48].try_into().unwrap();
-        let pk = try_deserialize_g1_projective(
-            pk_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize verification key G1 point".to_string(),
-            ),
-        )?;
+        let pk = try_deserialize_g1_projective(pk_bytes)?;
         Ok(PublicKeyUser { pk })
     }
 }
@@ -563,9 +533,11 @@ impl KeyPairUser {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 + 48 {
-            return Err(CompactEcashError::Deserialization(
-                "Failed to deserialize keypair : Invalid length".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "KeyPairUser".into(),
+                expected: 80,
+                actual: bytes.len(),
+            });
         }
         let sk = SecretKeyUser::from_bytes(&bytes[..32])?;
         let pk = PublicKeyUser::from_bytes(&bytes[32..32 + 48])?;

@@ -45,26 +45,21 @@ impl TryFrom<&[u8]> for WithdrawalReqInstance {
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let com_bytes: [u8; 48] = bytes[..48].try_into().unwrap();
-        let joined_commitment = try_deserialize_g1_projective(
-            &com_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize com".to_string()),
-        )?;
+        let joined_commitment = try_deserialize_g1_projective(&com_bytes)?;
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let h_bytes: [u8; 48] = bytes[48..96].try_into().unwrap();
-        let joined_commitment_hash = try_deserialize_g1_projective(
-            &h_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize h".to_string()),
-        )?;
+        let joined_commitment_hash = try_deserialize_g1_projective(&h_bytes)?;
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let pc_coms_len = u64::from_le_bytes(bytes[96..104].try_into().unwrap());
         let actual_pc_coms_len = (bytes.len() - 152) / 48;
         if pc_coms_len as usize != actual_pc_coms_len {
-            return Err(CompactEcashError::Deserialization(format!(
-                "Tried to deserialize pedersen commitments with inconsistent pc_coms_len (expected {}, got {})",
-                pc_coms_len, actual_pc_coms_len
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "pedersen commitments".into(),
+                expected: pc_coms_len as usize,
+                actual: actual_pc_coms_len,
+            });
         }
         let mut private_attributes_commitments = Vec::new();
         let mut pc_coms_end: usize = 0;
@@ -74,24 +69,14 @@ impl TryFrom<&[u8]> for WithdrawalReqInstance {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let pc_i_bytes = bytes[start..end].try_into().unwrap();
-            let pc_i = try_deserialize_g1_projective(
-                &pc_i_bytes,
-                CompactEcashError::Deserialization(
-                    "Failed to deserialize pedersen commitment".to_string(),
-                ),
-            )?;
+            let pc_i = try_deserialize_g1_projective(&pc_i_bytes)?;
             pc_coms_end = end;
             private_attributes_commitments.push(pc_i);
         }
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let pk_bytes = bytes[pc_coms_end..].try_into().unwrap();
-        let pk = try_deserialize_g1_projective(
-            &pk_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize user's public key".to_string(),
-            ),
-        )?;
+        let pk = try_deserialize_g1_projective(&pk_bytes)?;
 
         Ok(WithdrawalReqInstance {
             joined_commitment,
@@ -295,9 +280,9 @@ impl TryFrom<&[u8]> for WithdrawalReqProof {
 
     fn try_from(bytes: &[u8]) -> Result<WithdrawalReqProof> {
         if bytes.len() < 32 + 32 + 16 + 32 + 32 || (bytes.len() - 16) % 32 != 0 {
-            return Err(CompactEcashError::Deserialization(
-                "tried to deserialize proof of withdrawal with bytes of invalid length".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "WithdrawalReqProof".into(),
+            });
         }
 
         let mut idx = 0;
@@ -309,46 +294,26 @@ impl TryFrom<&[u8]> for WithdrawalReqProof {
         let response_opening_bytes = bytes[idx..idx + 32].try_into().unwrap();
         idx += 32;
 
-        let challenge = try_deserialize_scalar(
-            &challenge_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize challenge".to_string()),
-        )?;
+        let challenge = try_deserialize_scalar(&challenge_bytes)?;
 
-        let response_opening = try_deserialize_scalar(
-            &response_opening_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize the response to the random".to_string(),
-            ),
-        )?;
+        let response_opening = try_deserialize_scalar(&response_opening_bytes)?;
 
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let ro_len = u64::from_le_bytes(bytes[idx..idx + 8].try_into().unwrap());
         idx += 8;
         if bytes[idx..].len() < ro_len as usize * 32 + 8 {
-            return Err(CompactEcashError::Deserialization(
-                "tried to deserialize response openings".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "response openings".into(),
+            });
         }
         let ro_end = idx + ro_len as usize * 32;
-        let response_openings = try_deserialize_scalar_vec(
-            ro_len,
-            &bytes[idx..ro_end],
-            CompactEcashError::Deserialization(
-                "Failed to deserialize openings response".to_string(),
-            ),
-        )?;
+        let response_openings = try_deserialize_scalar_vec(ro_len, &bytes[idx..ro_end])?;
 
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let ra_len = u64::from_le_bytes(bytes[ro_end..ro_end + 8].try_into().unwrap());
-        let response_attributes = try_deserialize_scalar_vec(
-            ra_len,
-            &bytes[ro_end + 8..],
-            CompactEcashError::Deserialization(
-                "Failed to deserialize attributes response".to_string(),
-            ),
-        )?;
+        let response_attributes = try_deserialize_scalar_vec(ra_len, &bytes[ro_end + 8..])?;
 
         Ok(WithdrawalReqProof {
             challenge,

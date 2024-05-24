@@ -273,7 +273,7 @@ impl EcashVerifier {
         credential
             .verify(aggregated_verification_key)
             .map_err(|err| match err {
-                CompactEcashError::ExpirationDate(_) => {
+                CompactEcashError::ExpirationDateSignatureValidity => {
                     RequestHandlingError::InvalidBandwidthCredential(String::from(
                         "credential failed to verify on gateway - past expiration date",
                     ))

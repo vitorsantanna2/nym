@@ -69,10 +69,11 @@ impl TryFrom<&[u8]> for ExpirationDateSignature {
 
     fn try_from(bytes: &[u8]) -> Result<ExpirationDateSignature> {
         if bytes.len() != 96 {
-            return Err(CompactEcashError::Deserialization(format!(
-                "ExpirationDateSignature must be exactly 96 bytes, got {}",
-                bytes.len()
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "ExpirationDateSignature".into(),
+                expected: 96,
+                actual: bytes.len(),
+            });
         }
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
@@ -80,19 +81,8 @@ impl TryFrom<&[u8]> for ExpirationDateSignature {
         #[allow(clippy::unwrap_used)]
         let s_bytes: &[u8; 48] = &bytes[48..].try_into().unwrap();
 
-        let h = try_deserialize_g1_projective(
-            h_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize compressed h of the ExpirationDateSignature".to_string(),
-            ),
-        )?;
-
-        let s = try_deserialize_g1_projective(
-            s_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize compressed s of the ExpirationDateSignature".to_string(),
-            ),
-        )?;
+        let h = try_deserialize_g1_projective(h_bytes)?;
+        let s = try_deserialize_g1_projective(s_bytes)?;
 
         Ok(ExpirationDateSignature { h, s })
     }
@@ -133,7 +123,7 @@ pub fn sign_expiration_date(
     expiration_date: u64,
 ) -> Result<Vec<PartialExpirationDateSignature>> {
     if sk_auth.ys.len() < 3 {
-        return Err(CompactEcashError::VerificationKeyTooShort);
+        return Err(CompactEcashError::KeyTooShort);
     }
     let m0: Scalar = Scalar::from(expiration_date);
     let m2: Scalar = constants::TYPE_EXP;

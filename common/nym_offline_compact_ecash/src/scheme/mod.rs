@@ -19,7 +19,7 @@ use crate::scheme::setup::{GroupParameters, Parameters};
 use crate::traits::Bytable;
 use crate::utils::{
     check_bilinear_pairing, hash_to_scalar, try_deserialize_g1_projective,
-    try_deserialize_g2_projective, Signature, SignerIndex,
+    try_deserialize_g2_projective, try_deserialize_scalar, Signature, SignerIndex,
 };
 use crate::{constants, ecash_group_parameters};
 use crate::{Attribute, Base58};
@@ -104,57 +104,34 @@ impl TryFrom<&[u8]> for PartialWallet {
             SIGNATURE_BYTES + V_BYTES + EXPIRATION_DATE_BYTES + IDX_BYTES;
 
         if bytes.len() != EXPECTED_LENGTH {
-            return Err(CompactEcashError::Deserialization(format!(
-                "PartialWallet should be exactly {} bytes, got {}",
-                EXPECTED_LENGTH,
-                bytes.len()
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "PartialWallet".into(),
+                expected: EXPECTED_LENGTH,
+                actual: bytes.len(),
+            });
         }
 
-        let sig_bytes: &[u8; SIGNATURE_BYTES] = bytes
-            .get(..SIGNATURE_BYTES)
-            .and_then(|slice| slice.try_into().ok())
-            .ok_or_else(|| {
-                CompactEcashError::Deserialization("Failed to convert Signature bytes".to_string())
-            })?;
+        let mut j = 0;
 
-        let v_bytes: &[u8; V_BYTES] = bytes
-            .get(SIGNATURE_BYTES..(SIGNATURE_BYTES + V_BYTES))
-            .and_then(|slice| slice.try_into().ok())
-            .ok_or_else(|| {
-                CompactEcashError::Deserialization("Failed to convert Scalar bytes".to_string())
-            })?;
+        let sig = Signature::try_from(&bytes[j..j + SIGNATURE_BYTES])?;
+        j += SIGNATURE_BYTES;
 
-        let expiration_date_bytes: &[u8; EXPIRATION_DATE_BYTES] = bytes
-            .get((SIGNATURE_BYTES + V_BYTES)..(SIGNATURE_BYTES + V_BYTES + EXPIRATION_DATE_BYTES))
-            .and_then(|slice| slice.try_into().ok())
-            .ok_or_else(|| {
-                CompactEcashError::Deserialization(
-                    "Failed to convert Expiration Date bytes".to_string(),
-                )
-            })?;
+        //SAFETY: slice to array after length check
+        #[allow(clippy::unwrap_used)]
+        let v_bytes = bytes[j..j + V_BYTES].try_into().unwrap();
+        let v = try_deserialize_scalar(v_bytes)?;
+        j += V_BYTES;
 
-        let idx_bytes: &[u8; IDX_BYTES] = bytes
-            .get((SIGNATURE_BYTES + V_BYTES + EXPIRATION_DATE_BYTES)..)
-            .and_then(|slice| slice.try_into().ok())
-            .ok_or_else(|| {
-                CompactEcashError::Deserialization(
-                    "Failed to convert SignerIndex bytes".to_string(),
-                )
-            })?;
+        //SAFETY: slice to array after length check
+        #[allow(clippy::unwrap_used)]
+        let expiration_date_bytes = bytes[j..j + EXPIRATION_DATE_BYTES].try_into().unwrap();
+        let expiration_date = try_deserialize_scalar(expiration_date_bytes)?;
+        j += EXPIRATION_DATE_BYTES;
 
-        let sig = Signature::try_from(sig_bytes.as_slice())?;
-        let maybe_v = Scalar::from_bytes(v_bytes);
-        let v = if maybe_v.is_some().into() {
-            //SAFETY: here we know maybe_v is Some()
-            maybe_v.unwrap()
-        } else {
-            return Err(CompactEcashError::Deserialization(
-                "Failed to convert wallet secret bytes".to_string(),
-            ));
-        };
-        let expiration_date = Scalar::from_bytes(expiration_date_bytes).unwrap();
-        let idx = u64::from_le_bytes(*idx_bytes);
+        //SAFETY: slice to array after length check
+        #[allow(clippy::unwrap_used)]
+        let idx_bytes = bytes[j..].try_into().unwrap();
+        let idx = u64::from_le_bytes(idx_bytes);
 
         Ok(PartialWallet {
             sig,
@@ -456,10 +433,11 @@ impl TryFrom<&[u8]> for Wallet {
 
     fn try_from(bytes: &[u8]) -> Result<Wallet> {
         if bytes.len() != 168 {
-            return Err(CompactEcashError::Deserialization(format!(
-                "Wallet should be exactly 168 bytes, got {}",
-                bytes.len()
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "Wallet".into(),
+                expected: 168,
+                actual: bytes.len(),
+            });
         }
         //SAFETY : slice to array conversions after a length check
         #[allow(clippy::unwrap_used)]
@@ -597,9 +575,11 @@ impl Bytable for PayInfo {
 
     fn try_from_byte_slice(slice: &[u8]) -> std::result::Result<Self, CompactEcashError> {
         if slice.len() != 72 {
-            return Err(CompactEcashError::Deserialization(
-                "Invalid byte array for PayInfo deserialization".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "PayInfo".into(),
+                expected: 72,
+                actual: slice.len(),
+            });
         }
         //safety : we checked that slices length is exactly 72, hence this unwrap won't fail
         #[allow(clippy::unwrap_used)]
@@ -931,26 +911,20 @@ impl TryFrom<&[u8]> for Payment {
 
     fn try_from(bytes: &[u8]) -> Result<Payment> {
         if bytes.len() < 848 {
-            return Err(CompactEcashError::Deserialization(
-                "Invalid byte array for Payment deserialization".to_string(),
-            ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "Payment".into(),
+            });
         }
 
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let kappa_bytes: [u8; 96] = bytes[..96].try_into().unwrap();
-        let kappa = try_deserialize_g2_projective(
-            &kappa_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize kappa".to_string()),
-        )?;
+        let kappa = try_deserialize_g2_projective(&kappa_bytes)?;
 
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let kappa_e_bytes: [u8; 96] = bytes[96..192].try_into().unwrap();
-        let kappa_e = try_deserialize_g2_projective(
-            &kappa_e_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize kappa_e".to_string()),
-        )?;
+        let kappa_e = try_deserialize_g2_projective(&kappa_e_bytes)?;
 
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
@@ -970,10 +944,7 @@ impl TryFrom<&[u8]> for Payment {
         //SAFETY : slice to array conversion after a length check
         #[allow(clippy::unwrap_used)]
         let cc_bytes: [u8; 48] = bytes[392..440].try_into().unwrap();
-        let cc = try_deserialize_g1_projective(
-            &cc_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize cc".to_string()),
-        )?;
+        let cc = try_deserialize_g1_projective(&cc_bytes)?;
 
         let mut idx = 440;
         //SAFETY : slice to array conversion after a length check
@@ -985,12 +956,7 @@ impl TryFrom<&[u8]> for Payment {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let kappa_k_bytes: [u8; 96] = bytes[idx..idx + 96].try_into().unwrap();
-            let kappa_k_elem = try_deserialize_g2_projective(
-                &kappa_k_bytes,
-                CompactEcashError::Deserialization(
-                    "Failed to deserialize kappa_k element".to_string(),
-                ),
-            )?;
+            let kappa_k_elem = try_deserialize_g2_projective(&kappa_k_bytes)?;
             kappa_k.push(kappa_k_elem);
             idx += 96;
         }
@@ -1018,10 +984,7 @@ impl TryFrom<&[u8]> for Payment {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let ss_bytes: [u8; 48] = bytes[idx..idx + 48].try_into().unwrap();
-            let ss_elem = try_deserialize_g1_projective(
-                &ss_bytes,
-                CompactEcashError::Deserialization("Failed to deserialize ss element".to_string()),
-            )?;
+            let ss_elem = try_deserialize_g1_projective(&ss_bytes)?;
             ss.push(ss_elem);
             idx += 48;
         }
@@ -1035,10 +998,7 @@ impl TryFrom<&[u8]> for Payment {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let tt_bytes: [u8; 48] = bytes[idx..idx + 48].try_into().unwrap();
-            let tt_elem = try_deserialize_g1_projective(
-                &tt_bytes,
-                CompactEcashError::Deserialization("Failed to deserialize tt element".to_string()),
-            )?;
+            let tt_elem = try_deserialize_g1_projective(&tt_bytes)?;
             tt.push(tt_elem);
             idx += 48;
         }
@@ -1052,10 +1012,7 @@ impl TryFrom<&[u8]> for Payment {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let aa_bytes: [u8; 48] = bytes[idx..idx + 48].try_into().unwrap();
-            let aa_elem = try_deserialize_g1_projective(
-                &aa_bytes,
-                CompactEcashError::Deserialization("Failed to deserialize aa element".to_string()),
-            )?;
+            let aa_elem = try_deserialize_g1_projective(&aa_bytes)?;
             aa.push(aa_elem);
             idx += 48;
         }
@@ -1116,10 +1073,9 @@ impl TryFrom<&[u8]> for SerialNumber {
 
     fn try_from(bytes: &[u8]) -> Result<Self> {
         if bytes.len() % 48 != 0 {
-            return Err(
-                CompactEcashError::Deserialization(
-                    format!("Tried to deserialize blinded serial number with incorrect number of bytes, expected a multiple of 48, got {}", bytes.len()),
-                ));
+            return Err(CompactEcashError::DeserializationFailure {
+                object: "SerialNumber".into(),
+            });
         }
         let inner_len = bytes.len() / 48;
         let mut inner = Vec::with_capacity(inner_len);
@@ -1128,10 +1084,7 @@ impl TryFrom<&[u8]> for SerialNumber {
             //SAFETY : slice to array conversion after a length check
             #[allow(clippy::unwrap_used)]
             let ss_bytes: [u8; 48] = bytes[idx..idx + 48].try_into().unwrap();
-            let ss_elem = try_deserialize_g1_projective(
-                &ss_bytes,
-                CompactEcashError::Deserialization("Failed to deserialize ss element".to_string()),
-            )?;
+            let ss_elem = try_deserialize_g1_projective(&ss_bytes)?;
             inner.push(ss_elem);
             idx += 48;
         }

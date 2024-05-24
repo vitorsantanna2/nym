@@ -141,13 +141,13 @@ pub fn hash_to_scalar<M: AsRef<[u8]>>(msg: M) -> Scalar {
     output[0]
 }
 
-pub fn try_deserialize_scalar_vec(
-    expected_len: u64,
-    bytes: &[u8],
-    err: CompactEcashError,
-) -> Result<Vec<Scalar>> {
+pub fn try_deserialize_scalar_vec(expected_len: u64, bytes: &[u8]) -> Result<Vec<Scalar>> {
     if bytes.len() != expected_len as usize * 32 {
-        return Err(err);
+        return Err(CompactEcashError::DeserializationLengthMismatch {
+            object: "Scalar vector".into(),
+            expected: expected_len as usize * 32,
+            actual: bytes.len(),
+        });
     }
 
     let mut out = Vec::with_capacity(expected_len as usize);
@@ -155,8 +155,8 @@ pub fn try_deserialize_scalar_vec(
         //SAFETY : casting 32 len slice into 32 len array
         #[allow(clippy::unwrap_used)]
         let s_bytes = bytes[i * 32..(i + 1) * 32].try_into().unwrap();
-        let s = match Into::<Option<Scalar>>::into(Scalar::from_bytes(&s_bytes)) {
-            None => return Err(err),
+        let s = match Scalar::from_bytes(&s_bytes).into() {
+            None => return Err(CompactEcashError::ScalarDeserializationFailure),
             Some(scalar) => scalar,
         };
         out.push(s)
@@ -165,25 +165,20 @@ pub fn try_deserialize_scalar_vec(
     Ok(out)
 }
 
-pub fn try_deserialize_scalar(bytes: &[u8; 32], err: CompactEcashError) -> Result<Scalar> {
-    Into::<Option<Scalar>>::into(Scalar::from_bytes(bytes)).ok_or(err)
+pub fn try_deserialize_scalar(bytes: &[u8; 32]) -> Result<Scalar> {
+    Into::<Option<Scalar>>::into(Scalar::from_bytes(bytes))
+        .ok_or(CompactEcashError::ScalarDeserializationFailure)
 }
 
-pub fn try_deserialize_g1_projective(
-    bytes: &[u8; 48],
-    err: CompactEcashError,
-) -> Result<G1Projective> {
+pub fn try_deserialize_g1_projective(bytes: &[u8; 48]) -> Result<G1Projective> {
     Into::<Option<G1Affine>>::into(G1Affine::from_compressed(bytes))
-        .ok_or(err)
+        .ok_or(CompactEcashError::G1ProjectiveDeserializationFailure)
         .map(G1Projective::from)
 }
 
-pub fn try_deserialize_g2_projective(
-    bytes: &[u8; 96],
-    err: CompactEcashError,
-) -> Result<G2Projective> {
+pub fn try_deserialize_g2_projective(bytes: &[u8; 96]) -> Result<G2Projective> {
     Into::<Option<G2Affine>>::into(G2Affine::from_compressed(bytes))
-        .ok_or(err)
+        .ok_or(CompactEcashError::G2ProjectiveDeserializationFailure)
         .map(G2Projective::from)
 }
 
@@ -247,10 +242,11 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> Result<Signature> {
         if bytes.len() != 96 {
-            return Err(CompactEcashError::Deserialization(format!(
-                "Signature must be exactly 96 bytes, got {}",
-                bytes.len()
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "Signature".into(),
+                expected: 96,
+                actual: bytes.len(),
+            });
         }
         //SAFETY : [0..48] into 48 sized array and [48..96] into 48 sized array
         #[allow(clippy::unwrap_used)]
@@ -258,15 +254,8 @@ impl TryFrom<&[u8]> for Signature {
         #[allow(clippy::unwrap_used)]
         let sig2_bytes: &[u8; 48] = &bytes[48..].try_into().unwrap();
 
-        let sig1 = try_deserialize_g1_projective(
-            sig1_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize compressed sig1".to_string()),
-        )?;
-
-        let sig2 = try_deserialize_g1_projective(
-            sig2_bytes,
-            CompactEcashError::Deserialization("Failed to deserialize compressed sig2".to_string()),
-        )?;
+        let sig1 = try_deserialize_g1_projective(sig1_bytes)?;
+        let sig2 = try_deserialize_g1_projective(sig2_bytes)?;
 
         Ok(Signature(sig1, sig2))
     }
@@ -319,10 +308,11 @@ impl TryFrom<&[u8]> for BlindedSignature {
 
     fn try_from(bytes: &[u8]) -> Result<BlindedSignature> {
         if bytes.len() != 96 {
-            return Err(CompactEcashError::Deserialization(format!(
-                "BlindedSignature must be exactly 96 bytes, got {}",
-                bytes.len()
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "Blinded Signature".into(),
+                expected: 96,
+                actual: bytes.len(),
+            });
         }
         //SAFETY : [0..48] into 48 sized array and [48..96] into 48 sized array
         #[allow(clippy::unwrap_used)]
@@ -330,19 +320,8 @@ impl TryFrom<&[u8]> for BlindedSignature {
         #[allow(clippy::unwrap_used)]
         let bsig2_bytes: &[u8; 48] = &bytes[48..].try_into().unwrap();
 
-        let bsig1 = try_deserialize_g1_projective(
-            bsig1_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize compressed bsig1".to_string(),
-            ),
-        )?;
-
-        let bsig2 = try_deserialize_g1_projective(
-            bsig2_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize compressed bsig2".to_string(),
-            ),
-        )?;
+        let bsig1 = try_deserialize_g1_projective(bsig1_bytes)?;
+        let bsig2 = try_deserialize_g1_projective(bsig2_bytes)?;
 
         Ok(BlindedSignature(bsig1, bsig2))
     }

@@ -7,14 +7,6 @@ pub type Result<T> = std::result::Result<T, CompactEcashError>;
 
 #[derive(Error, Debug)]
 pub enum CompactEcashError {
-    //SW TODO Legacy error to avoid messing up PR stack, remove and adapt once collapsed
-    #[error("Deserialization error: {0}")]
-    Deserialization(String),
-
-    //SW TODO Legacy error to avoid messing up PR stack, remove and adapt once collapsed
-    #[error("Expiration Date related error: {0}")]
-    ExpirationDate(String),
-
     #[error("failed to verify expiration date signatures")]
     ExpirationDateSignatureVerification,
 
@@ -75,12 +67,22 @@ pub enum CompactEcashError {
     #[error("failed to verify coin indices signatures")]
     CoinIndicesSignatureVerification,
 
+    #[error("failed to deserialize a {object}")]
+    DeserializationFailure { object: String },
+
     #[error(
         "deserialization error, expected at least {} bytes, got {}",
         min,
         actual
     )]
     DeserializationMinLength { min: usize, actual: usize },
+
+    #[error("{object} deserialization error, expected {expected} bytes, got {actual}")]
+    DeserializationLengthMismatch {
+        object: String,
+        expected: usize,
+        actual: usize,
+    },
 
     #[error("tried to deserialize {object} with bytes of invalid length. Expected {actual} < {target} or {modulus_target} % {modulus} == 0")]
     DeserializationInvalidLength {
@@ -96,6 +98,9 @@ pub enum CompactEcashError {
 
     #[error("failed to deserialize G1Projective point from the received bytes - it might not have been canonically encoded")]
     G1ProjectiveDeserializationFailure,
+
+    #[error("failed to deserialize G2Projective point from the received bytes - it might not have been canonically encoded")]
+    G2ProjectiveDeserializationFailure,
 
     #[error("verification key is invalid for this opration")]
     VerificationKeyTooShort,

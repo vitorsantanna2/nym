@@ -51,10 +51,11 @@ impl TryFrom<&[u8]> for CoinIndexSignature {
 
     fn try_from(bytes: &[u8]) -> Result<CoinIndexSignature> {
         if bytes.len() != 96 {
-            return Err(CompactEcashError::Deserialization(format!(
-                "CoinIndexSignature must be exactly 96 bytes, got {}",
-                bytes.len()
-            )));
+            return Err(CompactEcashError::DeserializationLengthMismatch {
+                object: "CoinIndexSignature".into(),
+                expected: 96,
+                actual: bytes.len(),
+            });
         }
         //SAFETY : 48 sized slice into 48 sized array
         #[allow(clippy::unwrap_used)]
@@ -62,19 +63,9 @@ impl TryFrom<&[u8]> for CoinIndexSignature {
         #[allow(clippy::unwrap_used)]
         let s_bytes: &[u8; 48] = &bytes[48..].try_into().unwrap();
 
-        let h = try_deserialize_g1_projective(
-            h_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize compressed h of the CoinIndexSignature".to_string(),
-            ),
-        )?;
+        let h = try_deserialize_g1_projective(h_bytes)?;
 
-        let s = try_deserialize_g1_projective(
-            s_bytes,
-            CompactEcashError::Deserialization(
-                "Failed to deserialize compressed s of the CoinIndexSignature".to_string(),
-            ),
-        )?;
+        let s = try_deserialize_g1_projective(s_bytes)?;
 
         Ok(CoinIndexSignature { h, s })
     }
@@ -111,7 +102,7 @@ pub fn sign_coin_indices(
     sk_auth: &SecretKeyAuth,
 ) -> Result<Vec<PartialCoinIndexSignature>> {
     if sk_auth.ys.len() < 3 {
-        return Err(CompactEcashError::VerificationKeyTooShort);
+        return Err(CompactEcashError::KeyTooShort);
     }
     let m1: Scalar = constants::TYPE_IDX;
     let m2: Scalar = constants::TYPE_IDX;

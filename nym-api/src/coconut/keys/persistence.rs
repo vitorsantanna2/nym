@@ -23,9 +23,10 @@ impl PemStorableKey for KeyPairWithEpoch {
 
     fn from_bytes(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() <= mem::size_of::<EpochId>() {
-            return Err(CompactEcashError::Deserialization(
-                "insufficient number of bytes to decode secret key with epoch id".into(),
-            ));
+            return Err(CompactEcashError::DeserializationMinLength {
+                min: mem::size_of::<EpochId>(),
+                actual: bytes.len(),
+            });
         }
         let epoch_id = EpochId::from_be_bytes([
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],

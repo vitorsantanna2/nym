@@ -70,6 +70,9 @@ pub enum CoconutError {
         source: ParseIntError,
     },
 
+    #[error("the provided expiration date is too late")]
+    ExpirationDateTooLate,
+
     #[error("failed to parse expiry timestamp into proper datetime: {source}")]
     InvalidExpiryDate {
         unix_timestamp: i64,
