@@ -5629,6 +5629,7 @@ dependencies = [
  "nym-credentials-interface",
  "nym-crypto",
  "nym-ecash-contract-common",
+ "nym-network-defaults",
  "nym-validator-client",
  "rand 0.7.3",
  "serde",

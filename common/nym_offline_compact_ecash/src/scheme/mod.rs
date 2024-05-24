@@ -358,17 +358,18 @@ impl Wallet {
             aa.push(aa_k);
 
             // compute the serial numbers
-            let ss_k = pseudorandom_f_delta_v(grp_params, self.v(), lk);
+            let ss_k = pseudorandom_f_delta_v(grp_params, self.v(), lk)?;
             ss.push(ss_k);
             // compute the identification tags
             let tt_k = grp_params.gen1() * sk_user.sk
-                + pseudorandom_f_g_v(grp_params, self.v(), lk) * rr_k;
+                + pseudorandom_f_g_v(grp_params, self.v(), lk)? * rr_k;
             tt.push(tt_k);
 
             // compute values mu, o_mu, lambda, o_lambda
-            let mu_k: Scalar = (self.v() + Scalar::from(lk) + Scalar::from(1))
+            let maybe_mu_k: Option<Scalar> = (self.v() + Scalar::from(lk) + Scalar::from(1))
                 .invert()
-                .unwrap();
+                .into();
+            let mu_k = maybe_mu_k.ok_or(CompactEcashError::UnluckiestError)?;
             mu.push(mu_k);
 
             let o_mu_k = ((o_a_k + o_c) * mu_k).neg();
@@ -496,14 +497,14 @@ impl Bytable for Wallet {
 
 impl Base58 for Wallet {}
 
-fn pseudorandom_f_delta_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Projective {
-    let pow = (v + Scalar::from(l) + Scalar::from(1)).invert().unwrap();
-    params.delta() * pow
+fn pseudorandom_f_delta_v(params: &GroupParameters, v: Scalar, l: u64) -> Result<G1Projective> {
+    let maybe_pow: Option<Scalar> = (v + Scalar::from(l) + Scalar::from(1)).invert().into();
+    Ok(params.delta() * maybe_pow.ok_or(CompactEcashError::UnluckiestError)?)
 }
 
-fn pseudorandom_f_g_v(params: &GroupParameters, v: Scalar, l: u64) -> G1Projective {
-    let pow = (v + Scalar::from(l) + Scalar::from(1)).invert().unwrap();
-    params.gen1() * pow
+fn pseudorandom_f_g_v(params: &GroupParameters, v: Scalar, l: u64) -> Result<G1Projective> {
+    let maybe_pow: Option<Scalar> = (v + Scalar::from(l) + Scalar::from(1)).invert().into();
+    Ok(params.gen1() * maybe_pow.ok_or(CompactEcashError::UnluckiestError)?)
 }
 
 /// Computes the value of kappa (blinded private attributes for show) for proving possession of the wallet signature.

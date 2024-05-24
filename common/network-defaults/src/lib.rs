@@ -469,6 +469,12 @@ pub const TICKET_BANDWIDTH_VALUE: u64 = 100 * 1024 * 1024; // 100 MB
 /// How much bandwidth (in bytes) one freepass provides
 pub const BYTES_PER_FREEPASS: u64 = 10 * 1024 * 1024; // 10 MB
 
+/// Freepass validity period in days
+pub const FREEPASS_VALIDITY_PERIOD: u64 = 7;
+
+///Tickets to spend per payment
+pub const SPEND_TICKETS: u64 = 1;
+
 /// Threshold for claiming more bandwidth: 1 MB
 pub const REMAINING_BANDWIDTH_THRESHOLD: i64 = 1024 * 1024;
 /// How many ERC20 tokens should be burned to buy bandwidth

@@ -14,7 +14,6 @@ use bls12_381::{G1Projective, G2Prepared, G2Projective, Scalar};
 use group::Curve;
 use itertools::Itertools;
 use rayon::prelude::*;
-use time::{Duration, OffsetDateTime};
 
 /// A structure representing an expiration date signature.
 #[derive(Debug, PartialEq, Clone)]
@@ -132,20 +131,19 @@ impl Base58 for ExpirationDateSignature {}
 pub fn sign_expiration_date(
     sk_auth: &SecretKeyAuth,
     expiration_date: u64,
-) -> Vec<PartialExpirationDateSignature> {
+) -> Result<Vec<PartialExpirationDateSignature>> {
+    if sk_auth.ys.len() < 3 {
+        return Err(CompactEcashError::VerificationKeyTooShort);
+    }
     let m0: Scalar = Scalar::from(expiration_date);
     let m2: Scalar = constants::TYPE_EXP;
 
-    (0..constants::CRED_VALIDITY_PERIOD)
+    Ok((0..constants::CRED_VALIDITY_PERIOD)
         .into_par_iter()
         .fold(Vec::new, |mut exp_signs, l| {
-            let expiration_date =
-                OffsetDateTime::from_unix_timestamp(expiration_date as i64).unwrap();
             let valid_date = expiration_date
-                - Duration::days(constants::CRED_VALIDITY_PERIOD as i64)
-                + Duration::days(l as i64)
-                + Duration::days(1i64);
-            let m1: Scalar = Scalar::from(valid_date.unix_timestamp() as u64);
+                - ((constants::CRED_VALIDITY_PERIOD - l - 1) * constants::SECONDS_PER_DAY);
+            let m1: Scalar = Scalar::from(valid_date);
             // Compute the hash
             let h = hash_g1([m0.to_bytes(), m1.to_bytes()].concat());
             // Sign the attributes by performing scalar-point multiplications and accumulating the result
@@ -164,7 +162,7 @@ pub fn sign_expiration_date(
         .reduce(Vec::new, |mut v1, mut v2| {
             v1.append(&mut v2);
             v1
-        })
+        }))
 }
 
 /// Verifies the expiration date signatures against the given verification key.
@@ -193,11 +191,9 @@ pub fn verify_valid_dates_signatures(
     let m2: Scalar = constants::TYPE_EXP;
 
     signatures.par_iter().enumerate().try_for_each(|(l, sig)| {
-        let expiration_date = OffsetDateTime::from_unix_timestamp(expiration_date as i64).unwrap();
-        let valid_date = expiration_date - Duration::days(constants::CRED_VALIDITY_PERIOD as i64)
-            + Duration::days(l as i64)
-            + Duration::days(1i64);
-        let m1: Scalar = Scalar::from(valid_date.unix_timestamp() as u64);
+        let valid_date = expiration_date
+            - ((constants::CRED_VALIDITY_PERIOD - l as u64 - 1) * constants::SECONDS_PER_DAY);
+        let m1: Scalar = Scalar::from(valid_date);
         // Compute the hash
         let h = hash_g1([m0.to_bytes(), m1.to_bytes()].concat());
         // Verify the signature correctness
@@ -289,11 +285,9 @@ pub fn aggregate_expiration_signatures(
     let m0: Scalar = Scalar::from(expiration_date);
 
     for l in 0..constants::CRED_VALIDITY_PERIOD {
-        let expiration_date = OffsetDateTime::from_unix_timestamp(expiration_date as i64).unwrap();
-        let valid_date = expiration_date - Duration::days(constants::CRED_VALIDITY_PERIOD as i64)
-            + Duration::days(l as i64)
-            + Duration::days(1i64);
-        let m1: Scalar = Scalar::from(valid_date.unix_timestamp() as u64);
+        let valid_date = expiration_date
+            - ((constants::CRED_VALIDITY_PERIOD - l - 1) * constants::SECONDS_PER_DAY);
+        let m1: Scalar = Scalar::from(valid_date);
         // Compute the hash
         let h = hash_g1([m0.to_bytes(), m1.to_bytes()].concat());
 
@@ -337,18 +331,18 @@ pub fn find_index(spend_date: Scalar, expiration_date: Scalar) -> Result<usize> 
     let expiration_date_bytes = expiration_date.to_bytes();
     //SAFETY : slice to array conversion after a length check
     #[allow(clippy::unwrap_used)]
-    let expiration_date_u64 = u64::from_le_bytes(expiration_date_bytes[..8].try_into().unwrap());
+    let expiration_date = u64::from_le_bytes(expiration_date_bytes[..8].try_into().unwrap());
+
     let spend_date_bytes = spend_date.to_bytes();
     //SAFETY : slice to array conversion after a length check
     #[allow(clippy::unwrap_used)]
-    let spend_date_u64 = u64::from_le_bytes(spend_date_bytes[..8].try_into().unwrap());
-    let spend_date = OffsetDateTime::from_unix_timestamp(spend_date_u64 as i64).unwrap();
-    let start_date = OffsetDateTime::from_unix_timestamp(expiration_date_u64 as i64).unwrap()
-        - Duration::days(constants::CRED_VALIDITY_PERIOD as i64)
-        + Duration::days(1i64);
+    let spend_date = u64::from_le_bytes(spend_date_bytes[..8].try_into().unwrap());
+
+    let start_date =
+        expiration_date - ((constants::CRED_VALIDITY_PERIOD - 1) * constants::SECONDS_PER_DAY);
 
     if spend_date >= start_date {
-        let index_a = (spend_date - start_date).whole_days() as usize;
+        let index_a = ((spend_date - start_date) / constants::SECONDS_PER_DAY) as usize;
         if index_a as u64 >= constants::CRED_VALIDITY_PERIOD {
             Err(CompactEcashError::SpendDateTooLate)
         } else {
@@ -395,7 +389,7 @@ mod tests {
         let authorities_keys = ttp_keygen(2, 3).unwrap();
         let sk_i_auth = authorities_keys[0].secret_key();
         let vk_i_auth = authorities_keys[0].verification_key();
-        let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date);
+        let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date).unwrap();
 
         assert!(
             verify_valid_dates_signatures(&vk_i_auth, &partial_exp_sig, expiration_date).is_ok()
@@ -425,7 +419,7 @@ mod tests {
         let mut edt_partial_signatures: Vec<Vec<PartialExpirationDateSignature>> =
             Vec::with_capacity(constants::CRED_VALIDITY_PERIOD as usize);
         for sk_auth in secret_keys_authorities.iter() {
-            let sign = sign_expiration_date(sk_auth, expiration_date);
+            let sign = sign_expiration_date(sk_auth, expiration_date).unwrap();
             edt_partial_signatures.push(sign);
         }
 

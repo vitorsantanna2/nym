@@ -18,7 +18,7 @@ fn bench_partial_sign_expiration_date(c: &mut Criterion) {
     let authorities_keys = ttp_keygen(2, 3).unwrap();
     let sk_i_auth = authorities_keys[0].secret_key();
     let vk_i_auth = authorities_keys[0].verification_key();
-    let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date);
+    let partial_exp_sig = sign_expiration_date(&sk_i_auth, expiration_date).unwrap();
 
     // ISSUING AUTHORITY BENCHMARK: issue a set of (partial) signatures for a given expiration date
     group.bench_function(
@@ -63,7 +63,7 @@ fn bench_aggregate_expiration_date_signatures(c: &mut Criterion) {
     let mut partial_signatures: Vec<Vec<PartialExpirationDateSignature>> =
         Vec::with_capacity(constants::CRED_VALIDITY_PERIOD as usize);
     for sk in secret_keys_authorities.iter() {
-        let sign = sign_expiration_date(sk, expiration_date);
+        let sign = sign_expiration_date(sk, expiration_date).unwrap();
         partial_signatures.push(sign);
     }
 

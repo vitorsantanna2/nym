@@ -6,10 +6,11 @@ use bls12_381::Scalar;
 pub const PUBLIC_ATTRIBUTES_LEN: usize = 1; //expiration date
 pub const PRIVATE_ATTRIBUTES_LEN: usize = 2; //user and wallet secret
 pub const ATTRIBUTES_LEN: usize = PUBLIC_ATTRIBUTES_LEN + PRIVATE_ATTRIBUTES_LEN; // number of attributes encoded in a single zk-nym credential
+
 pub const CRED_VALIDITY_PERIOD: u64 = 30;
-pub const FREEPASS_VALIDITY_PERIOD: u64 = 7;
+pub(crate) const SECONDS_PER_DAY: u64 = 86400;
 pub const NB_TICKETS: u64 = 1000;
-pub const SPEND_TICKETS: u64 = 1;
+
 pub const TYPE_EXP: Scalar = Scalar::from_raw([
     u64::from_le_bytes(*b"ZKNYMEXP"),
     u64::from_le_bytes(*b"IRATIOND"),

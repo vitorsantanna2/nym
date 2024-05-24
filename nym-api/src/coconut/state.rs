@@ -314,14 +314,13 @@ impl State {
                 let Some(signing_key) = keypair_guard.as_ref() else {
                     return Err(CoconutError::KeyPairNotDerivedYet);
                 };
-                Ok(self
-                    .coin_indices_sigs_cache
+                self.coin_indices_sigs_cache
                     .refresh_signatures(
                         current_epoch,
                         &verification_key,
                         &signing_key.keys.secret_key(),
                     )
-                    .await)
+                    .await
             }
         }
     }
@@ -343,14 +342,13 @@ impl State {
                 let Some(signing_key) = keypair_guard.as_ref() else {
                     return Err(CoconutError::KeyPairNotDerivedYet);
                 };
-                Ok(self
-                    .exp_date_sigs_cache
+                self.exp_date_sigs_cache
                     .refresh_signatures(
                         current_epoch,
                         expiration_ts,
                         &signing_key.keys.secret_key(),
                     )
-                    .await)
+                    .await
             }
         }
     }
@@ -371,7 +369,7 @@ impl State {
         Ok(sign_expiration_date(
             &signing_key.keys.secret_key(),
             timestamp,
-        ))
+        )?)
     }
 
     pub async fn add_spent_credentials(&self, serial_number_bs58: &String) {

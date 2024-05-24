@@ -99,4 +99,10 @@ pub enum CompactEcashError {
 
     #[error("verification key is invalid for this opration")]
     VerificationKeyTooShort,
+
+    //context : This can happen only if the wallet secret `v` was picked such that `v + coin_index + 1 == 0`.
+    //The chance of this happening is of the order 2^-381 and not failing is waay too much work.
+    //TLDR: this event can happen, but with probability 0
+    #[error("you're one of the most unluck person on your planet and your wallet cannot complete this payment")]
+    UnluckiestError,
 }

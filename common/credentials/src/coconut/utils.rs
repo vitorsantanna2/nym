@@ -26,7 +26,8 @@ pub fn cred_exp_date_timestamp() -> u64 {
 
 pub fn freepass_exp_date_timestamp() -> u64 {
     today_timestamp()
-        + Duration::days(constants::FREEPASS_VALIDITY_PERIOD as i64 - 1).whole_seconds() as u64
+        + Duration::days(nym_network_defaults::FREEPASS_VALIDITY_PERIOD as i64 - 1).whole_seconds()
+            as u64
     //count today as well
 }
 

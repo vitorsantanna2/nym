@@ -7,9 +7,10 @@ use crate::coconut::bandwidth::{CredentialSpendingData, CredentialType};
 use crate::coconut::utils::today_timestamp;
 use crate::error::Error;
 use nym_credentials_interface::{
-    constants, date_scalar, CoinIndexSignature, ExpirationDateSignature, PayInfo, SecretKeyUser,
+    date_scalar, CoinIndexSignature, ExpirationDateSignature, PayInfo, SecretKeyUser,
     VerificationKeyAuth, Wallet,
 };
+use nym_network_defaults::SPEND_TICKETS;
 use nym_validator_client::nym_api::EpochId;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -171,7 +172,7 @@ impl IssuedBandwidthCredential {
             &self.ecash_secret_key,
             &pay_info,
             false,
-            constants::SPEND_TICKETS,
+            SPEND_TICKETS,
             self.exp_date_sigs(),
             coin_indices_signatures,
             date_scalar(spend_date),
@@ -180,7 +181,7 @@ impl IssuedBandwidthCredential {
         let value = match &self.variant_data {
             BandwidthCredentialIssuedDataVariant::FreePass => 0u64,
             BandwidthCredentialIssuedDataVariant::TicketBook(voucher) => {
-                constants::SPEND_TICKETS * voucher.value() as u64 / params.get_total_coins()
+                SPEND_TICKETS * voucher.value() as u64 / params.get_total_coins()
             }
         };
 

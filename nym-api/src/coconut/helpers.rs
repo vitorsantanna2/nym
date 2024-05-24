@@ -108,7 +108,7 @@ impl CoinIndexSignatureCache {
         expected_epoch_id: u64,
         verification_key: &VerificationKeyAuth,
         secret_key: &SecretKeyAuth,
-    ) -> Vec<CoinIndexSignature> {
+    ) -> Result<Vec<CoinIndexSignature>, CoconutError> {
         let mut signatures = self.signatures.write().await;
 
         //if this fails, it means someone else updated the signatures in the meantime
@@ -119,11 +119,11 @@ impl CoinIndexSignatureCache {
                 nym_compact_ecash::ecash_parameters(),
                 verification_key,
                 secret_key,
-            ));
+            )?);
             self.epoch_id.store(expected_epoch_id, Ordering::Relaxed);
         }
 
-        signatures.clone().unwrap() // Either we or someone else update the signatures, so they must be there
+        Ok(signatures.clone().unwrap()) // Either we or someone else update the signatures, so they must be there
     }
 }
 
@@ -163,7 +163,7 @@ impl ExpirationDateSignatureCache {
         expected_epoch_id: u64,
         expected_exp_date: u64,
         secret_key: &SecretKeyAuth,
-    ) -> Vec<ExpirationDateSignature> {
+    ) -> Result<Vec<ExpirationDateSignature>, CoconutError> {
         let mut signatures = self.signatures.write().await;
 
         //if this fails, it means someone else updated the signatures in the meantime
@@ -172,13 +172,13 @@ impl ExpirationDateSignatureCache {
         if self.epoch_id.load(Ordering::Relaxed) != expected_epoch_id
             || self.expiration_date.load(Ordering::Relaxed) != expected_exp_date
         {
-            *signatures = Some(sign_expiration_date(secret_key, expected_exp_date));
+            *signatures = Some(sign_expiration_date(secret_key, expected_exp_date)?);
             self.epoch_id.store(expected_epoch_id, Ordering::Relaxed);
             self.expiration_date
                 .store(expected_exp_date, Ordering::Relaxed);
         }
 
-        signatures.clone().unwrap() // Either we or someone else update the signatures, so they must be there
+        Ok(signatures.clone().unwrap()) // Either we or someone else update the signatures, so they must be there
     }
 }
 

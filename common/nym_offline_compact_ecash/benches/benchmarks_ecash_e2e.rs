@@ -36,7 +36,7 @@ pub fn generate_expiration_date_signatures(
     let mut edt_partial_signatures: Vec<Vec<PartialExpirationDateSignature>> =
         Vec::with_capacity(constants::CRED_VALIDITY_PERIOD as usize);
     for sk_auth in secret_keys_authorities.iter() {
-        let sign = sign_expiration_date(sk_auth, expiration_date);
+        let sign = sign_expiration_date(sk_auth, expiration_date).unwrap();
         edt_partial_signatures.push(sign);
     }
     let combined_data: Vec<(
@@ -66,7 +66,7 @@ pub fn generate_coin_indices_signatures(
     // create the partial signatures from each authority
     let partial_signatures: Vec<Vec<PartialCoinIndexSignature>> = secret_keys_authorities
         .iter()
-        .map(|sk_auth| sign_coin_indices(params, verification_key, sk_auth))
+        .map(|sk_auth| sign_coin_indices(params, verification_key, sk_auth).unwrap())
         .collect();
 
     let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> = indices

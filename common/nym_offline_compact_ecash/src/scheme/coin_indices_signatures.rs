@@ -109,11 +109,14 @@ pub fn sign_coin_indices(
     params: &Parameters,
     vk: &VerificationKeyAuth,
     sk_auth: &SecretKeyAuth,
-) -> Vec<PartialCoinIndexSignature> {
+) -> Result<Vec<PartialCoinIndexSignature>> {
+    if sk_auth.ys.len() < 3 {
+        return Err(CompactEcashError::VerificationKeyTooShort);
+    }
     let m1: Scalar = constants::TYPE_IDX;
     let m2: Scalar = constants::TYPE_IDX;
     let vk_bytes = vk.to_bytes();
-    (0..params.get_total_coins())
+    Ok((0..params.get_total_coins())
         .into_par_iter()
         .fold(
             || Vec::with_capacity(params.get_total_coins() as usize),
@@ -145,7 +148,7 @@ pub fn sign_coin_indices(
         .reduce(Vec::new, |mut v1, mut v2| {
             v1.append(&mut v2);
             v1
-        })
+        }))
 }
 
 /// Verifies coin index signatures using parallel iterators.
@@ -342,7 +345,7 @@ mod tests {
         let verification_key =
             aggregate_verification_keys(&verification_keys_auth, Some(&indices)).unwrap();
 
-        let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_i_auth);
+        let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_i_auth).unwrap();
         assert!(verify_coin_indices_signatures(
             &params,
             &verification_key,
@@ -372,7 +375,7 @@ mod tests {
         let verification_key =
             aggregate_verification_keys(&verification_keys_auth, Some(&indices)).unwrap();
 
-        let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_0_auth);
+        let partial_signatures = sign_coin_indices(&params, &verification_key, &sk_0_auth).unwrap();
         // Since we used a non matching verification key to verify the signature, the verification should fail
         assert!(verify_coin_indices_signatures(
             &params,
@@ -407,7 +410,7 @@ mod tests {
         // create the partial signatures from each authority
         let partial_signatures: Vec<Vec<PartialCoinIndexSignature>> = secret_keys_authorities
             .iter()
-            .map(|sk_auth| sign_coin_indices(&params, &verification_key, sk_auth))
+            .map(|sk_auth| sign_coin_indices(&params, &verification_key, sk_auth).unwrap())
             .collect();
 
         let combined_data: Vec<(u64, VerificationKeyAuth, Vec<PartialCoinIndexSignature>)> =
