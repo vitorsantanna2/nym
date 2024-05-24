@@ -118,8 +118,8 @@ mod tests {
             &pay_info,
             false,
             spend_vv,
-            dates_signatures,
-            coin_indices_signatures,
+            &dates_signatures,
+            &coin_indices_signatures,
             spend_date,
         )?;
 

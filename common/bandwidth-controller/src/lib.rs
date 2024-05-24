@@ -173,7 +173,7 @@ impl<C, St: Storage> BandwidthController<C, St> {
         let spend_request = retrieved_credential.credential.prepare_for_spending(
             &verification_key,
             pay_info.into(),
-            coin_indices_signatures,
+            &coin_indices_signatures,
         )?;
         Ok(PreparedCredential {
             data: spend_request,

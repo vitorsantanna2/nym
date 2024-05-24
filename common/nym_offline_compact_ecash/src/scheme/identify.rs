@@ -156,8 +156,8 @@ mod tests {
                 &pay_info1,
                 false,
                 spend_vv,
-                dates_signatures,
-                coin_indices_signatures,
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();
@@ -264,8 +264,8 @@ mod tests {
                 &pay_info1,
                 false,
                 spend_vv,
-                dates_signatures.clone(),
-                coin_indices_signatures.clone(),
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();
@@ -285,8 +285,8 @@ mod tests {
                 &pay_info2,
                 false,
                 spend_vv,
-                dates_signatures,
-                coin_indices_signatures,
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();
@@ -399,8 +399,8 @@ mod tests {
                 &pay_info1,
                 false,
                 spend_vv,
-                dates_signatures.clone(),
-                coin_indices_signatures.clone(),
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();
@@ -424,8 +424,8 @@ mod tests {
                 &pay_info2,
                 false,
                 spend_vv,
-                dates_signatures.clone(),
-                coin_indices_signatures.clone(),
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();
@@ -542,8 +542,8 @@ mod tests {
                 &pay_info1,
                 false,
                 spend_vv,
-                dates_signatures.clone(),
-                coin_indices_signatures.clone(),
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();
@@ -566,8 +566,8 @@ mod tests {
                 &pay_info2,
                 false,
                 spend_vv,
-                dates_signatures.clone(),
-                coin_indices_signatures.clone(),
+                &dates_signatures,
+                &coin_indices_signatures,
                 spend_date,
             )
             .unwrap();

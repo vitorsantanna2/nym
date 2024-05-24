@@ -252,8 +252,8 @@ impl Wallet {
         pay_info: &PayInfo,
         bench_flag: bool,
         spend_value: u64,
-        valid_dates_signatures: Vec<ExpirationDateSignature>,
-        coin_indices_signatures: Vec<CoinIndexSignature>,
+        valid_dates_signatures: &[ExpirationDateSignature],
+        coin_indices_signatures: &[CoinIndexSignature],
         spend_date: Scalar,
     ) -> Result<Payment> {
         // Extract group parameters

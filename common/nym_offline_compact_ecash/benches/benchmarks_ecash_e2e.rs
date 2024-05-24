@@ -194,8 +194,8 @@ fn bench_compact_ecash(c: &mut Criterion) {
                         &pay_info,
                         false,
                         case.spend_vv,
-                        dates_signatures.clone(),
-                        coin_indices_signatures.clone(),
+                        &dates_signatures,
+                        &coin_indices_signatures,
                         spend_date,
                     )
                     .unwrap()
@@ -211,8 +211,8 @@ fn bench_compact_ecash(c: &mut Criterion) {
             &pay_info,
             false,
             case.spend_vv,
-            dates_signatures.clone(),
-            coin_indices_signatures.clone(),
+            &dates_signatures,
+            &coin_indices_signatures,
             spend_date,
         )
         .unwrap();
@@ -249,8 +249,8 @@ fn bench_compact_ecash(c: &mut Criterion) {
             &pay_info2,
             true,
             case.spend_vv,
-            dates_signatures.clone(),
-            coin_indices_signatures.clone(),
+            &dates_signatures,
+            &coin_indices_signatures,
             spend_date,
         )
         .unwrap();

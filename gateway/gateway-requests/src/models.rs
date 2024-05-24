@@ -396,7 +396,7 @@ mod tests {
             .prepare_for_spending(
                 &keypair.verification_key(),
                 pay_info,
-                coin_indices_signatures,
+                &coin_indices_signatures,
             )
             .unwrap();
 

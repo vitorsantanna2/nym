@@ -128,8 +128,8 @@ impl IssuedBandwidthCredential {
         self.expiration_date < today_timestamp()
     }
 
-    pub fn exp_date_sigs(&self) -> Vec<ExpirationDateSignature> {
-        self.exp_date_signatures.clone()
+    pub fn exp_date_sigs(&self) -> &Vec<ExpirationDateSignature> {
+        &self.exp_date_signatures
     }
 
     pub fn wallet(&self) -> &Wallet {
@@ -162,10 +162,11 @@ impl IssuedBandwidthCredential {
         &mut self,
         verification_key: &VerificationKeyAuth,
         pay_info: PayInfo,
-        coin_indices_signatures: Vec<CoinIndexSignature>,
+        coin_indices_signatures: &[CoinIndexSignature],
     ) -> Result<CredentialSpendingData, Error> {
         let params = nym_credentials_interface::ecash_parameters();
         let spend_date = today_timestamp();
+        let expiration_date_signatures = self.exp_date_sigs().clone();
         let payment = self.wallet.spend(
             params,
             verification_key,
@@ -173,7 +174,7 @@ impl IssuedBandwidthCredential {
             &pay_info,
             false,
             SPEND_TICKETS,
-            self.exp_date_sigs(),
+            &expiration_date_signatures,
             coin_indices_signatures,
             date_scalar(spend_date),
         )?;
