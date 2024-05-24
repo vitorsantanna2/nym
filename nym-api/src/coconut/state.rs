@@ -318,7 +318,7 @@ impl State {
                     .refresh_signatures(
                         current_epoch,
                         &verification_key,
-                        &signing_key.keys.secret_key(),
+                        signing_key.keys.secret_key(),
                     )
                     .await
             }
@@ -343,11 +343,7 @@ impl State {
                     return Err(CoconutError::KeyPairNotDerivedYet);
                 };
                 self.exp_date_sigs_cache
-                    .refresh_signatures(
-                        current_epoch,
-                        expiration_ts,
-                        &signing_key.keys.secret_key(),
-                    )
+                    .refresh_signatures(current_epoch, expiration_ts, signing_key.keys.secret_key())
                     .await
             }
         }
@@ -367,7 +363,7 @@ impl State {
         };
 
         Ok(sign_expiration_date(
-            &signing_key.keys.secret_key(),
+            signing_key.keys.secret_key(),
             timestamp,
         )?)
     }

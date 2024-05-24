@@ -13,7 +13,9 @@ pub use credential_sender::PendingCredential;
 use futures::channel::mpsc::{self, UnboundedSender};
 use log::*;
 use nym_credentials::CredentialSpendingData;
-use nym_credentials_interface::{CompactEcashError, CredentialType, PayInfo, VerificationKeyAuth};
+use nym_credentials_interface::{
+    CompactEcashError, CredentialType, NymPayInfo, VerificationKeyAuth,
+};
 use nym_gateway_requests::models::CredentialSpendingRequest;
 use nym_validator_client::coconut::all_ecash_api_clients;
 use nym_validator_client::nym_api::EpochId;
@@ -49,7 +51,7 @@ pub struct EcashVerifier {
     // keys never change during epochs
     master_keys: RwLock<HashMap<EpochId, VerificationKeyAuth>>,
     pk_bytes: [u8; 32], //bytes represenation of a pub key representing the verifier
-    pay_infos: Mutex<Vec<PayInfo>>,
+    pay_infos: Mutex<Vec<NymPayInfo>>,
     cred_sender: UnboundedSender<PendingCredential>,
     double_spend_detector: Option<DoubleSpendingDetector>,
 }
@@ -268,7 +270,7 @@ impl EcashVerifier {
         credential: &CredentialSpendingData,
         aggregated_verification_key: &VerificationKeyAuth,
     ) -> Result<(), RequestHandlingError> {
-        let insert_index = self.verify_pay_info(credential.pay_info.clone()).await?;
+        let insert_index = self.verify_pay_info(credential.pay_info.into()).await?;
 
         credential
             .verify(aggregated_verification_key)
@@ -283,10 +285,13 @@ impl EcashVerifier {
                 )),
             })?;
 
-        self.insert_pay_info(credential.pay_info.clone(), insert_index)
+        self.insert_pay_info(credential.pay_info.into(), insert_index)
     }
 
-    pub async fn verify_pay_info(&self, pay_info: PayInfo) -> Result<usize, RequestHandlingError> {
+    pub async fn verify_pay_info(
+        &self,
+        pay_info: NymPayInfo,
+    ) -> Result<usize, RequestHandlingError> {
         //Public key check
         if pay_info.pk() != self.pk_bytes {
             return Err(RequestHandlingError::InvalidBandwidthCredential(
@@ -354,7 +359,11 @@ impl EcashVerifier {
         }
     }
 
-    fn insert_pay_info(&self, pay_info: PayInfo, index: usize) -> Result<(), RequestHandlingError> {
+    fn insert_pay_info(
+        &self,
+        pay_info: NymPayInfo,
+        index: usize,
+    ) -> Result<(), RequestHandlingError> {
         let mut inner = self
             .pay_infos
             .lock()

@@ -5,8 +5,6 @@ use std::convert::TryInto;
 
 use bls12_381::{G1Projective, G2Prepared, G2Projective, Scalar};
 use group::Curve;
-use rand::Rng;
-use time::OffsetDateTime;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::{CompactEcashError, Result};
@@ -521,49 +519,9 @@ fn compute_kappa(
 ///
 /// * `payinfo_bytes` - An array of bytes representing the payment information.
 ///
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct PayInfo {
     pub pay_info_bytes: [u8; 72],
-}
-
-impl PayInfo {
-    /// Generates a new `PayInfo` instance with random bytes, a timestamp, and a provider public key.
-    ///
-    /// # Arguments
-    ///
-    /// * `provider_pk` - The public key of the payment provider.
-    ///
-    /// # Returns
-    ///
-    /// A new `PayInfo` instance.
-    ///
-    pub fn generate_pay_info(provider_pk: [u8; 32]) -> PayInfo {
-        let mut pay_info_bytes = [0u8; 72];
-
-        // Generating random bytes using the `rand` crate
-        rand::thread_rng().fill(&mut pay_info_bytes[..32]);
-
-        // Adding timestamp bytes
-        let timestamp = OffsetDateTime::now_utc().unix_timestamp();
-        pay_info_bytes[32..40].copy_from_slice(&timestamp.to_be_bytes());
-
-        // Adding provider public key bytes
-        pay_info_bytes[40..].copy_from_slice(&provider_pk);
-
-        PayInfo { pay_info_bytes }
-    }
-
-    pub fn timestamp(&self) -> i64 {
-        //SAFETY : slice to array conversion after a length check
-        #[allow(clippy::unwrap_used)]
-        i64::from_be_bytes(self.pay_info_bytes[32..40].try_into().unwrap())
-    }
-
-    pub fn pk(&self) -> [u8; 32] {
-        //SAFETY : slice to array conversion after a length check
-        #[allow(clippy::unwrap_used)]
-        self.pay_info_bytes[40..].try_into().unwrap()
-    }
 }
 
 impl Bytable for PayInfo {

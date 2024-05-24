@@ -14,6 +14,8 @@ license.workspace = true
 bls12_381 = { workspace = true, default-features = false }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
+time = { workspace = true }
+rand = { workspace = true }
 
 nym-compact-ecash = { path = "../nym_offline_compact_ecash" }
 nym-coconut = { path = "../nymcoconut" }

@@ -1783,8 +1783,9 @@ mod credential_tests {
             )
             .unwrap();
 
-        let issued = issuance.to_issued_credential(wallet.clone(), exp_date_sigs.clone(), epoch);
-        let issued2 = issuance.to_issued_credential(wallet, exp_date_sigs, epoch);
+        let mut issued =
+            issuance.to_issued_credential(wallet.clone(), exp_date_sigs.clone(), epoch);
+        let mut issued2 = issuance.to_issued_credential(wallet, exp_date_sigs, epoch);
 
         let coin_indices_signatures = generate_coin_indices_signatures(
             ecash_parameters(),

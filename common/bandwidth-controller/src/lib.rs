@@ -8,7 +8,7 @@ use log::{error, warn};
 
 use nym_credential_storage::models::StorableIssuedCredential;
 use nym_credentials::coconut::utils::{obtain_coin_indices_signatures, signatures_to_string};
-use nym_credentials_interface::{constants, PayInfo, VerificationKeyAuth};
+use nym_credentials_interface::{constants, NymPayInfo, VerificationKeyAuth};
 
 use nym_credential_storage::storage::Storage;
 
@@ -166,13 +166,13 @@ impl<C, St: Storage> BandwidthController<C, St> {
             }
         };
 
-        let pay_info = PayInfo::generate_pay_info(provider_pk);
+        let pay_info = NymPayInfo::generate(provider_pk);
 
         // the below would only be executed once we know where we want to spend it (i.e. which gateway and stuff)
 
         let spend_request = retrieved_credential.credential.prepare_for_spending(
             &verification_key,
-            pay_info,
+            pay_info.into(),
             coin_indices_signatures,
         )?;
         Ok(PreparedCredential {
